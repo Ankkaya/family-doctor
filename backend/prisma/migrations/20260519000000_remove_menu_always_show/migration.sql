@@ -1,0 +1,1 @@
+ALTER TABLE "Menu" DROP COLUMN IF EXISTS "alwaysShow";

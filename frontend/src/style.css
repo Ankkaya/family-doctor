@@ -1,0 +1,270 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 全局基础样式 */
+html,
+body,
+#app {
+  height: 100%;
+}
+
+html {
+  overflow-x: hidden;
+  /* 基础文字颜色，所有未指定颜色的文本继承此值 */
+  color: rgb(var(--base-text-color));
+}
+
+/* 页面背景 */
+body {
+  background-color: rgb(var(--layout-bg-color));
+  background-image:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.45), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 32%);
+  overflow: hidden;
+}
+
+/* 过渡动画 */
+.transition-theme {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+html.dark body {
+  background-image:
+    radial-gradient(circle at top left, rgba(56, 189, 248, 0.06), transparent 24%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 26%);
+}
+
+/* 暗色模式下的边框颜色适配 */
+.dark .border-gray-200 {
+  border-color: rgb(55, 65, 81);
+}
+
+.dark .border-gray-300 {
+  border-color: rgb(75, 85, 99);
+}
+
+.layout-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.55) transparent;
+  scrollbar-gutter: stable;
+}
+
+.content-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.55) transparent;
+}
+
+.layout-scrollbar::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.content-scrollbar::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.layout-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.content-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.layout-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    rgba(148, 163, 184, 0.72),
+    rgba(148, 163, 184, 0.42)
+  );
+  border: 2px solid transparent;
+  border-radius: 9999px;
+  background-clip: padding-box;
+}
+
+.content-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    rgba(148, 163, 184, 0.72),
+    rgba(148, 163, 184, 0.42)
+  );
+  border: 2px solid transparent;
+  border-radius: 9999px;
+  background-clip: padding-box;
+}
+
+.layout-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    180deg,
+    rgba(100, 116, 139, 0.78),
+    rgba(100, 116, 139, 0.52)
+  );
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.content-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    180deg,
+    rgba(100, 116, 139, 0.78),
+    rgba(100, 116, 139, 0.52)
+  );
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.layout-scrollbar::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.content-scrollbar::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.dark .layout-scrollbar {
+  scrollbar-color: rgba(100, 116, 139, 0.8) transparent;
+}
+
+.dark .content-scrollbar {
+  scrollbar-color: rgba(100, 116, 139, 0.8) transparent;
+}
+
+.dark .layout-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    rgba(100, 116, 139, 0.82),
+    rgba(71, 85, 105, 0.56)
+  );
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.dark .content-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    rgba(100, 116, 139, 0.82),
+    rgba(71, 85, 105, 0.56)
+  );
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.dark .layout-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    180deg,
+    rgba(148, 163, 184, 0.88),
+    rgba(100, 116, 139, 0.66)
+  );
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.dark .content-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    180deg,
+    rgba(148, 163, 184, 0.88),
+    rgba(100, 116, 139, 0.66)
+  );
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.app-data-table :is(.n-data-table-wrapper, .n-data-table-base-table-body) {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.55) transparent;
+}
+
+.app-data-table :is(.n-data-table-wrapper, .n-data-table-base-table-body)::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.app-data-table :is(.n-data-table-wrapper, .n-data-table-base-table-body)::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.app-data-table :is(.n-data-table-wrapper, .n-data-table-base-table-body)::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    rgba(148, 163, 184, 0.72),
+    rgba(148, 163, 184, 0.42)
+  );
+  border: 2px solid transparent;
+  border-radius: 9999px;
+  background-clip: padding-box;
+}
+
+.app-data-table :is(.n-data-table-wrapper, .n-data-table-base-table-body)::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    180deg,
+    rgba(100, 116, 139, 0.78),
+    rgba(100, 116, 139, 0.52)
+  );
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.dark .app-data-table :is(.n-data-table-wrapper, .n-data-table-base-table-body) {
+  scrollbar-color: rgba(100, 116, 139, 0.8) transparent;
+}
+
+.dark .app-data-table :is(.n-data-table-wrapper, .n-data-table-base-table-body)::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    rgba(100, 116, 139, 0.82),
+    rgba(71, 85, 105, 0.56)
+  );
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.dark .app-data-table :is(.n-data-table-wrapper, .n-data-table-base-table-body)::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    180deg,
+    rgba(148, 163, 184, 0.88),
+    rgba(100, 116, 139, 0.66)
+  );
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.page-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+}
+
+.page-container {
+  min-height: 100%;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.page-container--tight {
+  padding-top: 12px;
+}
+
+.page-card {
+  min-height: 100%;
+}
+
+.n-card.bg-container {
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  box-shadow:
+    0 14px 34px rgba(15, 23, 42, 0.06),
+    0 2px 8px rgba(15, 23, 42, 0.05);
+}
+
+.dark .n-card.bg-container {
+  border-color: rgba(148, 163, 184, 0.12);
+  box-shadow:
+    0 18px 42px rgba(2, 6, 23, 0.34),
+    0 2px 10px rgba(2, 6, 23, 0.2);
+}

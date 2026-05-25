@@ -1,0 +1,63 @@
+# 测试环境覆盖配置
+# 使用方式: docker compose -f docker-compose.yaml -f docker-compose.staging.yaml up -d
+#
+# 默认测试端口与本地/正式环境错开，可通过 FD_STAGING_* 环境变量覆盖。
+#   Backend 23001, Frontend 28080, Agent 28000, DB 25432, Redis 26379, MinIO 29000/29001
+
+services:
+  db:
+    container_name: family-doctor-staging-db
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?测试环境必须设置 DB_PASSWORD}
+    ports: !override
+      - "${FD_STAGING_DB_PORT:-25432}:5432"
+
+  backend:
+    container_name: family-doctor-staging-backend
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?测试环境必须设置 DATABASE_URL}
+      FILE_BASE_URL: ${FILE_BASE_URL:?测试环境必须设置 FILE_BASE_URL}
+      JWT_SECRET: ${JWT_SECRET:?测试环境必须设置 JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?测试环境必须设置 JWT_REFRESH_SECRET}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?测试环境必须设置 REDIS_PASSWORD}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?测试环境必须设置 MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?测试环境必须设置 MINIO_SECRET_KEY}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-true}
+      CORS_ORIGINS: ${CORS_ORIGINS:?测试环境必须设置 CORS_ORIGINS}
+      NODE_ENV: staging
+    ports: !override
+      - "${FD_STAGING_BACKEND_PORT:-23001}:3001"
+    restart: unless-stopped
+
+  frontend:
+    container_name: family-doctor-staging-frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_MODE: staging
+    ports: !override
+      - "${FD_STAGING_FRONTEND_PORT:-28080}:8080"
+    restart: unless-stopped
+
+  minio:
+    container_name: family-doctor-staging-minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?测试环境必须设置 MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?测试环境必须设置 MINIO_ROOT_PASSWORD}
+    ports: !override
+      - "${FD_STAGING_MINIO_API_PORT:-29000}:9000"
+      - "${FD_STAGING_MINIO_CONSOLE_PORT:-29001}:9001"
+    restart: unless-stopped
+
+  redis:
+    container_name: family-doctor-staging-redis
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?测试环境必须设置 REDIS_PASSWORD}
+    ports: !override
+      - "${FD_STAGING_REDIS_PORT:-26379}:6379"
+
+  agent:
+    container_name: family-doctor-staging-agent
+    ports: !override
+      - "${FD_STAGING_AGENT_PORT:-28000}:8000"

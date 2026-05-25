@@ -1,0 +1,44 @@
+# 离线评测集。tests/eval/run_eval.py 加载并断言。
+# 字段：
+#   id           用例标识
+#   question     用户提问
+#   expectedAny  推荐中至少命中其中一个 medicineId (OR)
+#   forbidIds    推荐不得出现的 medicineId (例如 RX 不该出现)
+#   emergency    true 时断言 recommends 为空
+
+medicines: &medicines
+  - id: ibu
+    name: 布洛芬缓释胶囊
+    otc: OTC
+    indication: 头痛、发热、肌肉酸痛的短期缓解
+    contraindication: 胃溃疡、孕晚期慎用
+  - id: lhqw
+    name: 连花清瘟胶囊
+    otc: OTC
+    indication: 发热、咳嗽、咽干咽痛
+  - id: hxzq
+    name: 藿香正气水
+    otc: OTC
+    indication: 腹泻、恶心、胃肠型感冒
+  - id: amx
+    name: 阿莫西林胶囊
+    otc: RX
+    indication: 细菌感染相关炎症
+
+cases:
+  - id: headache-fever
+    question: 头痛发热两天
+    medicines: *medicines
+    expectedAny: [ibu, lhqw]
+    forbidIds: [amx]
+
+  - id: gi-upset
+    question: 腹泻恶心，有点肚子不舒服
+    medicines: *medicines
+    expectedAny: [hxzq]
+    forbidIds: [amx]
+
+  - id: emergency-chest-pain
+    question: 我爸突然胸痛意识不清
+    medicines: *medicines
+    emergency: true

@@ -1,0 +1,127 @@
+# 基础服务定义 — 所有环境共用
+# 使用方式：
+#   本地开发: docker compose up -d
+#   测试环境: docker compose -f docker-compose.yaml -f docker-compose.staging.yaml up -d
+#   正式环境: docker compose -f docker-compose.yaml -f docker-compose.production.yaml up -d
+
+name: family-doctor
+
+services:
+  minio:
+    image: minio/minio:latest
+    container_name: family-doctor-minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    command: server /data --console-address ":9001"
+    ports:
+      - "${FD_MINIO_API_PORT:-19000}:9000"
+      - "${FD_MINIO_CONSOLE_PORT:-19001}:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  db:
+    image: postgres:16-alpine
+    container_name: family-doctor-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: platform_db
+    ports:
+      - "${FD_DB_PORT:-15432}:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d platform_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  redis:
+    image: redis:8-alpine
+    container_name: family-doctor-redis
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis123}
+    command: ["sh", "-c", "redis-server --appendonly yes --requirepass \"$$REDIS_PASSWORD\""]
+    ports:
+      - "${FD_REDIS_PORT:-16379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: family-doctor-backend
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/platform_db?schema=public
+      REDIS_URL: redis://redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis123}
+      PORT: 3001
+      FILE_BASE_URL: http://localhost:${FD_BACKEND_PORT:-13001}
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+      JWT_REFRESH_SECRET: your-super-secret-refresh-key-change-in-production
+      NODE_ENV: development
+      ENABLE_SWAGGER: true
+      CORS_ORIGINS: http://localhost:${FD_FRONTEND_PORT:-18080},http://localhost:5173,http://localhost:1420
+      AGENT_BASE_URL: http://agent:8000
+      AGENT_TIMEOUT_MS: 30000
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_USE_SSL: false
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin123
+      MINIO_BUCKET_NAME: platform
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      agent:
+        condition: service_started
+    ports:
+      - "${FD_BACKEND_PORT:-13001}:3001"
+
+  agent:
+    build:
+      context: ./agent
+      dockerfile: Dockerfile
+    container_name: family-doctor-agent
+    env_file:
+      - ./agent/.env
+    environment:
+      APP_HOST: 0.0.0.0
+      APP_PORT: 8000
+      APP_LOG_LEVEL: info
+    ports:
+      - "${FD_AGENT_PORT:-18000}:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: family-doctor-frontend
+    depends_on:
+      - backend
+    ports:
+      - "${FD_FRONTEND_PORT:-18080}:8080"
+
+volumes:
+  db-data:
+  minio-data:
+  redis-data:

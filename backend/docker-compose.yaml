@@ -1,0 +1,39 @@
+version: '3.9'                    # 使用 docker-compose v3.9 语法版本
+
+services:                         # 定义要运行的多个服务（容器）
+  db:                             # 数据库服务：PostgreSQL
+    image: postgres:16-alpine     # 使用官方 Postgres 16 的 Alpine 轻量镜像
+    container_name: demo-postgres # 容器名称，方便调试和引用
+    environment:                  # 数据库初始化环境变量
+      POSTGRES_USER: postgres     # 数据库用户名
+      POSTGRES_PASSWORD: postgres # 数据库密码
+      POSTGRES_DB: docker_demo    # 默认创建的数据库名称
+    ports:
+      - "5432:5432"               # 将宿主机 5432 端口映射到容器 5432
+    volumes:
+      - db-data:/var/lib/postgresql/data  # 持久化数据库数据到名为 db-data 的卷
+    healthcheck:                  # 健康检查，确保数据库就绪后再启动依赖服务
+      test: ["CMD-SHELL", "pg_isready -U postgres"]  # 使用 pg_isready 检查数据库状态
+      interval: 10s               # 每 10 秒检查一次
+      timeout: 5s                 # 每次检查的超时时间为 5 秒
+      retries: 5                  # 连续 5 次失败视为不健康
+
+  backend:                        # 后端服务：NestJS 应用
+    build:                        # 构建镜像配置
+      context: .                  # 构建上下文为当前 backend 目录
+      dockerfile: Dockerfile      # 使用当前目录下的 Dockerfile
+    container_name: demo-backend  # 后端容器名称
+    environment:                  # 传入后端应用所需环境变量
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/docker_demo?schema=public  # 连接 db 服务的数据库 URL
+      PORT: 3001                  # 应用监听端口，保持与 main.ts 中一致
+      JWT_SECRET: your-secret-key # JWT 签名秘钥，用于生成和验证 Token
+      NODE_ENV: production        # 运行环境设为 production
+    depends_on:                   # 声明依赖关系
+      db:                         # 依赖上面的 db 服务
+        condition: service_healthy  # 仅在 db 健康检查通过后才启动 backend
+    ports:
+      - "3001:3001"               # 将宿主机 3001 端口映射到后端容器 3001
+
+volumes:                          # 定义可复用的命名卷
+  db-data:                        # Postgres 数据持久化卷
+

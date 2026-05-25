@@ -1,0 +1,35 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Family Doctor",
+  "version": "0.1.0",
+  "identifier": "com.familydoctor.app",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Family Doctor",
+        "width": 390,
+        "height": 844,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "capabilities": [
+        "default-capability",
+        "mobile-capability",
+        "desktop-capability"
+      ]
+    }
+  },
+  "bundle": {
+    "active": false,
+    "targets": "all",
+    "icon": []
+  }
+}

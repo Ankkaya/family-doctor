@@ -1,0 +1,20 @@
+{
+  "name": "family-doctor-platform",
+  "private": true,
+  "packageManager": "pnpm@10.26.2",
+  "scripts": {
+    "dev:infra": "docker compose up -d db redis minio",
+    "dev:agent": "python -m uvicorn app.main:app --app-dir agent --reload --host 0.0.0.0 --port 18000",
+    "dev:backend": "pnpm --dir backend start:dev",
+    "dev:admin": "pnpm --dir frontend dev",
+    "dev:app": "npm --prefix app run dev",
+    "dev:app:web": "npm --prefix app run web:dev",
+    "build:backend": "pnpm --dir backend build",
+    "build:admin": "pnpm --dir frontend build",
+    "build:app": "npm --prefix app run build",
+    "generate:module": "node scripts/generate-module.mjs",
+    "test:generator": "node --test scripts/generate-module.test.mjs",
+    "test:table-columns": "node --experimental-strip-types frontend/src/utils/table-column-settings.test.mjs",
+    "test:auth-refresh": "node --experimental-strip-types frontend/src/utils/auth-refresh.test.mjs"
+  }
+}

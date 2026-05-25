@@ -1,0 +1,70 @@
+# 正式环境覆盖配置
+# 使用方式: docker compose -f docker-compose.yaml -f docker-compose.production.yaml up -d
+#
+# ⚠️ 正式环境的敏感值必须通过环境变量或 .env 文件注入，不要直接修改此文件
+
+services:
+  db:
+    container_name: family-doctor-prod-db
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?正式环境必须设置 DB_PASSWORD}
+    # 正式环境不暴露端口到宿主机
+    ports: !override []
+
+  agent:
+    container_name: family-doctor-prod-agent
+    ports: !override
+      - "8000:8000"
+
+  backend:
+    container_name: family-doctor-prod-backend
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?正式环境必须设置 DATABASE_URL}
+      FILE_BASE_URL: ${FILE_BASE_URL:?正式环境必须设置 FILE_BASE_URL}
+      JWT_SECRET: ${JWT_SECRET:?正式环境必须设置 JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?正式环境必须设置 JWT_REFRESH_SECRET}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?正式环境必须设置 REDIS_PASSWORD}
+      NODE_ENV: production
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?正式环境必须设置 MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?正式环境必须设置 MINIO_SECRET_KEY}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
+      CORS_ORIGINS: ${CORS_ORIGINS:?正式环境必须设置 CORS_ORIGINS}
+    restart: always
+    ports: !override
+      - "3001:3001"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  frontend:
+    container_name: family-doctor-prod-frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_MODE: production
+    restart: always
+    ports: !override
+      - "8080:8080"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  minio:
+    container_name: family-doctor-prod-minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?正式环境必须设置 MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?正式环境必须设置 MINIO_ROOT_PASSWORD}
+    # 正式环境不暴露 MinIO 控制台到外部
+    ports: !override
+      - "9000:9000"
+    restart: always
+
+  redis:
+    container_name: family-doctor-prod-redis
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?正式环境必须设置 REDIS_PASSWORD}
+    ports: !override
+      - "6379:6379"

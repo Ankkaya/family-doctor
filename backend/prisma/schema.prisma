@@ -1,0 +1,423 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ==================== RBAC 核心 ====================
+
+// 用户模型
+model User {
+  id        Int       @id @default(autoincrement())
+  username  String    @unique
+  email     String?   @unique
+  password  String
+  name      String?
+  avatarUrl String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // 软删除标记
+
+  // 用户与角色多对多关系
+  roles     Role[]    @relation("UserRoles")
+
+  @@index([deletedAt])
+}
+
+// 角色模型
+model Role {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  code        String    @unique
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime? // 软删除标记
+
+  // 角色与用户多对多关系
+  users       User[]    @relation("UserRoles")
+  // 角色与菜单多对多关系
+  menus       Menu[]    @relation("RoleMenus")
+
+  @@index([deletedAt])
+}
+
+// 菜单模型（树形结构）
+model Menu {
+  id          Int       @id @default(autoincrement())
+  name        String
+  path        String?
+  icon        String?
+  component   String?
+  redirect    String?
+  permission  String?
+  parentId    Int?
+  order       Int       @default(0)
+  hidden      Boolean   @default(false)
+  type        String    @default("menu") // menu | button | iframe
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime? // 软删除标记
+
+  // 自引用关系（树形）
+  parent      Menu?     @relation("MenuTree", fields: [parentId], references: [id])
+  children    Menu[]    @relation("MenuTree")
+
+  // 角色与菜单多对多关系
+  roles       Role[]    @relation("RoleMenus")
+
+  @@index([deletedAt])
+  @@index([permission])
+}
+
+// ==================== 系统设施 ====================
+
+// 系统配置 KV
+model SystemSetting {
+  id          Int       @id @default(autoincrement())
+  key         String    @unique
+  name        String
+  value       Json
+  category    String?
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// 数据字典类型
+model DictionaryType {
+  id          Int       @id @default(autoincrement())
+  name        String
+  code        String    @unique
+  description String?
+  isEnabled   Boolean   @default(true)
+  sort        Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  items       DictionaryItem[]
+
+  @@index([deletedAt])
+  @@index([isEnabled])
+  @@index([sort])
+}
+
+// 数据字典项
+model DictionaryItem {
+  id          Int            @id @default(autoincrement())
+  typeId      Int
+  label       String
+  value       String
+  color       String?
+  isEnabled   Boolean        @default(true)
+  sort        Int            @default(0)
+  remark      String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  deletedAt   DateTime?
+
+  type        DictionaryType @relation(fields: [typeId], references: [id])
+
+  @@index([typeId])
+  @@index([deletedAt])
+  @@index([isEnabled])
+  @@index([sort])
+}
+
+// 操作日志
+model OperationLog {
+  id          Int       @id @default(autoincrement())
+  userId      Int?
+  username    String?
+  action      LogAction
+  module      String?
+  target      String?
+  targetId    String?
+  targetType  String?
+  description String?
+  method      String?
+  path        String?
+  ip          String?
+  userAgent   String?
+  statusCode  Int?
+  duration    Int?      // 耗时 ms
+  requestBody String?
+  oldValue    Json?
+  newValue    Json?
+  response    String?
+  error       String?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([module])
+}
+
+// 登录日志
+model LoginLog {
+  id        Int          @id @default(autoincrement())
+  userId    Int?
+  username  String?
+  type      LoginLogType
+  ip        String?
+  userAgent String?
+  success   Boolean      @default(true)
+  message   String?
+  createdAt DateTime     @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// 上传记录
+model UploadRecord {
+  id           Int      @id @default(autoincrement())
+  userId       Int?
+  username     String?
+  originalName String
+  storedName   String
+  mimeType     String?
+  size         Int?     // bytes
+  bucket       String?
+  objectKey    String?
+  url          String?
+  module       String?
+  refId        String?
+  refType      String?
+  status       String?
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([module])
+  @@index([refId])
+}
+
+// ==================== 家庭医生 MVP ====================
+
+model MedicineCatalog {
+  id               String   @id @default(cuid())
+  name             String
+  aliases          String[] @default([])
+  otc              OtcType
+  indication       String
+  contraindication String?
+  adverseReaction  String?  @map("adverse_reaction")
+  dosage           String?
+  barcode          String?  @unique
+  approvalNumber   String?  @map("approval_number")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+  inventories       UserMedicineInventory[]
+  householdInventories HouseholdMedicineInventory[]
+
+  @@index([name])
+  @@map("medicine_catalog")
+}
+
+model AppUser {
+  id                 String    @id @default(cuid())
+  username           String?
+  passwordHash       String?   @map("password_hash")
+  phone              String?
+  email              String?
+  nickname           String?
+  avatarUrl          String?   @map("avatar_url")
+  age                Int?
+  gender             String?
+  allergies          String?
+  medicationHistory  String?   @map("medication_history")
+  status             String    @default("active")
+  defaultHouseholdId String?   @map("default_household_id")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  deletedAt          DateTime? @map("deleted_at")
+
+  defaultHousehold   Household? @relation("AppUserDefaultHousehold", fields: [defaultHouseholdId], references: [id], onDelete: SetNull)
+  ownedHouseholds    Household[] @relation("HouseholdOwner")
+  memberships        HouseholdMember[]
+  consultations      ConsultationSession[]
+  createdInventories HouseholdMedicineInventory[] @relation("HouseholdInventoryCreator")
+
+  @@index([username])
+  @@index([phone])
+  @@index([email])
+  @@index([defaultHouseholdId])
+  @@index([deletedAt])
+  @@map("app_user")
+}
+
+model Household {
+  id              String    @id @default(cuid())
+  name            String
+  code            String    @unique
+  ownerUserId     String    @map("owner_user_id")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  owner           AppUser   @relation("HouseholdOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  defaultForUsers AppUser[] @relation("AppUserDefaultHousehold")
+  members         HouseholdMember[]
+  inventory       HouseholdMedicineInventory[]
+  sessions        ConsultationSession[]
+
+  @@index([ownerUserId])
+  @@index([deletedAt])
+  @@map("household")
+}
+
+model HouseholdMember {
+  id          String    @id @default(cuid())
+  householdId String    @map("household_id")
+  userId      String    @map("user_id")
+  role        String    @default("member")
+  displayName String?   @map("display_name")
+  joinedAt    DateTime  @default(now()) @map("joined_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  user        AppUser   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([householdId])
+  @@index([userId])
+  @@index([deletedAt])
+  @@map("household_member")
+}
+
+model HouseholdMedicineInventory {
+  id          String          @id @default(cuid())
+  householdId String          @map("household_id")
+  medicineId  String?         @map("medicine_id")
+  name        String
+  aliases     String[]        @default([])
+  otc         OtcType
+  indication  String
+  contraindication String?
+  adverseReaction  String?   @map("adverse_reaction")
+  dosage      String?
+  barcode     String?
+  approvalNumber String?     @map("approval_number")
+  quantity    Int             @default(1)
+  expireAt    DateTime?       @map("expire_at") @db.Date
+  source      String?
+  notes       String?
+  createdBy   String?         @map("created_by")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+  deletedAt   DateTime?       @map("deleted_at")
+
+  household   Household       @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  medicine    MedicineCatalog? @relation(fields: [medicineId], references: [id], onDelete: SetNull)
+  creator     AppUser?        @relation("HouseholdInventoryCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@index([householdId])
+  @@index([medicineId])
+  @@index([createdBy])
+  @@index([expireAt])
+  @@index([deletedAt])
+  @@map("household_medicine_inventory")
+}
+
+model UserMedicineInventory {
+  id         String          @id @default(cuid())
+  devUserId  String          @map("dev_user_id")
+  medicineId String          @map("medicine_id")
+  quantity   Int             @default(1)
+  expireAt   DateTime?       @map("expire_at") @db.Date
+  source     String?
+  notes      String?
+  createdAt  DateTime        @default(now()) @map("created_at")
+  updatedAt  DateTime        @updatedAt @map("updated_at")
+  medicine   MedicineCatalog @relation(fields: [medicineId], references: [id], onDelete: Cascade)
+
+  @@unique([devUserId, medicineId])
+  @@index([devUserId])
+  @@index([medicineId])
+  @@map("user_medicine_inventory")
+}
+
+model ConsultationSession {
+  id        String                @id @default(cuid())
+  userId    String?               @map("user_id")
+  householdId String?             @map("household_id")
+  devUserId String?               @map("dev_user_id")
+  title     String?
+  createdAt DateTime              @default(now()) @map("created_at")
+  deletedAt DateTime?             @map("deleted_at")
+  user      AppUser?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  household Household?            @relation(fields: [householdId], references: [id], onDelete: SetNull)
+  messages  ConsultationMessage[]
+  traces    AgentTrace[]
+
+  @@index([devUserId, createdAt])
+  @@index([householdId, createdAt])
+  @@index([userId, createdAt])
+  @@index([deletedAt])
+  @@map("consultation_session")
+}
+
+model ConsultationMessage {
+  id         String              @id @default(cuid())
+  sessionId  String              @map("session_id")
+  role       MsgRole
+  content    String              @db.Text
+  recommends Json?
+  createdAt  DateTime            @default(now()) @map("created_at")
+  session    ConsultationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+  @@map("consultation_message")
+}
+
+model AgentTrace {
+  id        String               @id @default(cuid())
+  sessionId String?              @map("session_id")
+  nodeName  String               @map("node_name")
+  input     Json
+  output    Json
+  llmModel  String?              @map("llm_model")
+  tokenIn   Int?                 @map("token_in")
+  tokenOut  Int?                 @map("token_out")
+  latencyMs Int                  @map("latency_ms")
+  error     String?
+  createdAt DateTime             @default(now()) @map("created_at")
+  session   ConsultationSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  @@index([sessionId, createdAt])
+  @@index([createdAt])
+  @@map("agent_trace")
+}
+
+// ==================== 枚举 ====================
+
+enum LogAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  EXPORT
+  IMPORT
+  OTHER
+}
+
+enum LoginLogType {
+  LOGIN
+  LOGOUT
+  REFRESH
+  REGISTER
+}
+
+enum OtcType {
+  OTC
+  RX
+}
+
+enum MsgRole {
+  USER
+  ASSISTANT
+}

@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+exec "/mnt/c/Windows/System32/cmd.exe" /d /c "\"C:\\Program Files\\nodejs\\npm.cmd\" $*"
