@@ -22,19 +22,25 @@ def make_render_node(llm: LLMProvider, *, disclaimer: str):
     async def render(state: dict[str, Any]) -> dict[str, Any]:
         parsed: ParsedSymptoms = state["parsed"]
         risked: list[Recommend] = state.get("risked") or []
+        safety_warnings: list[str] = state.get("safety_warnings") or []
 
         with trace_node(
             "render",
-            {"emergency": parsed.emergency, "recommendCount": len(risked)},
+            {
+                "emergency": parsed.emergency,
+                "recommendCount": len(risked),
+                "riskLevel": state.get("risk_level", "unknown"),
+            },
         ) as rec:
-            if parsed.emergency:
+            if parsed.emergency or state.get("emergency"):
                 answer = EMERGENCY_ANSWER
                 recommends: list[Recommend] = []
             else:
                 user = (
                     f"症状: {', '.join(parsed.symptoms) or '未明确'}\n"
                     f"严重度: {parsed.severity}\n"
-                    f"候选药品数: {len(risked)}"
+                    f"候选药品数: {len(risked)}\n"
+                    f"安全审核: {'; '.join(safety_warnings) or '无'}"
                 )
                 answer = await llm.chat(system=RENDER_SYSTEM, user=user)
                 recommends = risked

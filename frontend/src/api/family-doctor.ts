@@ -60,6 +60,7 @@ export interface AdminAppUser {
   age: number | null;
   gender: 'male' | 'female' | 'other' | 'unknown' | string | null;
   allergies: string | null;
+  chronicDiseases: string | null;
   medicationHistory: string | null;
   status: 'active' | 'disabled' | string;
   defaultHouseholdId: string | null;

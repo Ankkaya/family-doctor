@@ -4,6 +4,15 @@ import { ConsultationService } from './consultation.service';
 describe('ConsultationService household isolation', () => {
   function createService(sessionRows: unknown[] = []) {
     const prisma = {
+      appUser: {
+        findFirst: jest.fn().mockResolvedValue({
+          age: 30,
+          gender: 'male',
+          allergies: null,
+          chronicDiseases: null,
+          medicationHistory: null,
+        }),
+      },
       $queryRaw: jest.fn().mockResolvedValue(sessionRows),
       $executeRaw: jest.fn().mockResolvedValue(1),
     };
@@ -67,8 +76,12 @@ describe('ConsultationService household isolation', () => {
       },
     );
 
-    expect(cabinetService.findAgentBriefsByHousehold).toHaveBeenCalledWith('household-1');
+    expect(cabinetService.findAgentBriefsByHousehold).toHaveBeenCalledWith('household-1', '头痛怎么办');
     expect(agentClient.consult).toHaveBeenCalledWith(expect.objectContaining({
+      userProfile: expect.objectContaining({
+        age: 30,
+        gender: 'male',
+      }),
       medicines: [
         expect.objectContaining({
           id: 'med-1',

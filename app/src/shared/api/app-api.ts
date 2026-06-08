@@ -103,6 +103,7 @@ export type AppUser = {
   age?: number | null;
   gender?: "male" | "female" | "other" | "unknown" | string | null;
   allergies?: string | null;
+  chronicDiseases?: string | null;
   medicationHistory?: string | null;
   defaultHouseholdId?: string | null;
 };
@@ -112,6 +113,7 @@ export type AppProfileInput = {
   age?: number | null;
   gender?: "male" | "female" | "other" | "unknown" | null;
   allergies?: string | null;
+  chronicDiseases?: string | null;
   medicationHistory?: string | null;
 };
 

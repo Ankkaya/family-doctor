@@ -229,6 +229,7 @@ model AppUser {
   age                Int?
   gender             String?
   allergies          String?
+  chronicDiseases    String?   @map("chronic_diseases")
   medicationHistory  String?   @map("medication_history")
   status             String    @default("active")
   defaultHouseholdId String?   @map("default_household_id")

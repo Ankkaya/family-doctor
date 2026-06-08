@@ -29,6 +29,7 @@ export function ProfileSettingsScreen({
   const [age, setAge] = useState(user.age == null ? "" : String(user.age));
   const [gender, setGender] = useState<GenderValue>((user.gender as GenderValue | undefined) ?? "unknown");
   const [allergies, setAllergies] = useState(user.allergies ?? "");
+  const [chronicDiseases, setChronicDiseases] = useState(user.chronicDiseases ?? "");
   const [medicationHistory, setMedicationHistory] = useState(user.medicationHistory ?? "");
   const [localError, setLocalError] = useState("");
   const [editor, setEditor] = useState<AvatarEditorState | null>(null);
@@ -39,6 +40,7 @@ export function ProfileSettingsScreen({
     setAge(user.age == null ? "" : String(user.age));
     setGender((user.gender as GenderValue | undefined) ?? "unknown");
     setAllergies(user.allergies ?? "");
+    setChronicDiseases(user.chronicDiseases ?? "");
     setMedicationHistory(user.medicationHistory ?? "");
   }, [user]);
 
@@ -58,6 +60,7 @@ export function ProfileSettingsScreen({
       age: parsedAge,
       gender,
       allergies,
+      chronicDiseases,
       medicationHistory,
     });
   }
@@ -171,9 +174,15 @@ export function ProfileSettingsScreen({
           onChange={setAllergies}
         />
         <TextAreaField
-          label="曾用药"
+          label="基础病"
+          value={chronicDiseases}
+          placeholder="例如：高血压、糖尿病、肝肾疾病"
+          onChange={setChronicDiseases}
+        />
+        <TextAreaField
+          label="长期用药"
           value={medicationHistory}
-          placeholder="例如：布洛芬、氯雷他定"
+          placeholder="例如：降压药、降糖药、抗凝药"
           onChange={setMedicationHistory}
         />
       </section>

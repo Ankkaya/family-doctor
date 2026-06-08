@@ -96,6 +96,7 @@ describe('AppAuthService', () => {
         age: true,
         gender: true,
         allergies: true,
+        chronicDiseases: true,
         medicationHistory: true,
         defaultHouseholdId: true,
       },
@@ -176,6 +177,7 @@ describe('AppAuthService', () => {
         age: true,
         gender: true,
         allergies: true,
+        chronicDiseases: true,
         medicationHistory: true,
         passwordHash: true,
         defaultHouseholdId: true,
@@ -213,6 +215,7 @@ describe('AppAuthService', () => {
       age: 36,
       gender: 'female',
       allergies: '青霉素',
+      chronicDiseases: '高血压',
       medicationHistory: '布洛芬',
       defaultHouseholdId: 'household-1',
     });
@@ -222,6 +225,7 @@ describe('AppAuthService', () => {
       age: 36,
       gender: 'female',
       allergies: '青霉素',
+      chronicDiseases: '高血压',
       medicationHistory: '布洛芬',
     });
 
@@ -232,6 +236,7 @@ describe('AppAuthService', () => {
         age: 36,
         gender: 'female',
         allergies: '青霉素',
+        chronicDiseases: '高血压',
         medicationHistory: '布洛芬',
       },
       select: {
@@ -242,6 +247,7 @@ describe('AppAuthService', () => {
         age: true,
         gender: true,
         allergies: true,
+        chronicDiseases: true,
         medicationHistory: true,
         defaultHouseholdId: true,
       },
@@ -251,6 +257,7 @@ describe('AppAuthService', () => {
       age: 36,
       gender: 'female',
       allergies: '青霉素',
+      chronicDiseases: '高血压',
       medicationHistory: '布洛芬',
     });
   });
@@ -265,6 +272,7 @@ describe('AppAuthService', () => {
       age: null,
       gender: null,
       allergies: null,
+      chronicDiseases: null,
       medicationHistory: null,
       defaultHouseholdId: null,
     });
@@ -272,6 +280,7 @@ describe('AppAuthService', () => {
     await service.updateProfile('app-user-1', {
       avatarUrl: ' ',
       allergies: '',
+      chronicDiseases: '   ',
       medicationHistory: '   ',
     });
 
@@ -279,6 +288,7 @@ describe('AppAuthService', () => {
       data: {
         avatarUrl: null,
         allergies: null,
+        chronicDiseases: null,
         medicationHistory: null,
       },
     }));
@@ -305,6 +315,7 @@ describe('AppAuthService', () => {
       age: null,
       gender: null,
       allergies: null,
+      chronicDiseases: null,
       medicationHistory: null,
       defaultHouseholdId: null,
     });

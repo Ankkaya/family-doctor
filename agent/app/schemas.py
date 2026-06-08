@@ -19,6 +19,17 @@ class MedicineBrief(_CamelModel):
     indication: str
     contraindication: str | None = None
     adverse_reaction: str | None = Field(default=None, alias="adverseReaction")
+    dosage: str | None = None
+    search_score: float | None = Field(default=None, alias="searchScore")
+    search_source: str | None = Field(default=None, alias="searchSource")
+
+
+class UserProfile(_CamelModel):
+    age: int | None = None
+    gender: str | None = None
+    allergies: str | None = None
+    chronic_diseases: str | None = Field(default=None, alias="chronicDiseases")
+    medication_history: str | None = Field(default=None, alias="medicationHistory")
 
 
 class Recommend(_CamelModel):
@@ -45,6 +56,7 @@ class ConsultRequest(_CamelModel):
     session_id: str = Field(alias="sessionId")
     question: str
     medicines: list[MedicineBrief] = Field(default_factory=list)
+    user_profile: UserProfile | None = Field(default=None, alias="userProfile")
     allow_rx_recommendation: bool = Field(default=False, alias="allowRxRecommendation")
 
 

@@ -5,6 +5,17 @@ export type AgentMedicineBrief = {
   indication: string;
   contraindication?: string | null;
   adverseReaction?: string | null;
+  dosage?: string | null;
+  searchScore?: number;
+  searchSource?: string;
+};
+
+export type AgentUserProfile = {
+  age?: number | null;
+  gender?: string | null;
+  allergies?: string | null;
+  chronicDiseases?: string | null;
+  medicationHistory?: string | null;
 };
 
 export type AgentRecommend = {
@@ -31,6 +42,7 @@ export type AgentConsultInput = {
   sessionId: string;
   question: string;
   medicines: AgentMedicineBrief[];
+  userProfile?: AgentUserProfile | null;
   allowRxRecommendation?: boolean;
 };
 

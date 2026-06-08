@@ -3,25 +3,40 @@ from __future__ import annotations
 from langgraph.graph import END, StateGraph
 
 from ..llm.provider import LLMProvider
+from .nodes.emergency import make_emergency_node
 from .nodes.match import make_match_node
 from .nodes.parse import make_parse_node
+from .nodes.preprocess import make_preprocess_node
+from .nodes.rank import make_rank_node
 from .nodes.render import make_render_node
 from .nodes.risk import make_risk_node
+from .nodes.safety import make_safety_node
+from .nodes.special_population import make_special_population_node
 from .state import GraphState
 
 
 def build_graph(*, llm: LLMProvider, disclaimer: str):
-    """构建 v1 直线图：parse → match → risk → render。"""
+    """构建问药流程图：规则做安全，LLM 做理解和表达。"""
     sg = StateGraph(GraphState)
+    sg.add_node("preprocess", make_preprocess_node())
     sg.add_node("parse", make_parse_node(llm))
+    sg.add_node("emergency", make_emergency_node())
+    sg.add_node("special_population", make_special_population_node())
     sg.add_node("match", make_match_node())
-    sg.add_node("risk", make_risk_node(llm))
+    sg.add_node("rank", make_rank_node())
+    sg.add_node("risk", make_risk_node())
+    sg.add_node("safety", make_safety_node())
     sg.add_node("render", make_render_node(llm, disclaimer=disclaimer))
 
-    sg.set_entry_point("parse")
-    sg.add_edge("parse", "match")
-    sg.add_edge("match", "risk")
-    sg.add_edge("risk", "render")
+    sg.set_entry_point("preprocess")
+    sg.add_edge("preprocess", "parse")
+    sg.add_edge("parse", "emergency")
+    sg.add_edge("emergency", "special_population")
+    sg.add_edge("special_population", "match")
+    sg.add_edge("match", "rank")
+    sg.add_edge("rank", "risk")
+    sg.add_edge("risk", "safety")
+    sg.add_edge("safety", "render")
     sg.add_edge("render", END)
 
     return sg.compile()

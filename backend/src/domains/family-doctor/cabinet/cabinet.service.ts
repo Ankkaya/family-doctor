@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 import { AgentMedicineBrief } from '../agent-client/agent-client.types';
+import { buildDeterministicEmbeddingText, buildSearchText } from '../search/embedding.util';
 import { CurrentHousehold } from '@/domains/households/households.service';
 import { CreateCabinetInventoryDto } from './dto/create-cabinet-inventory.dto';
 import { QueryAdminCabinetDto } from './dto/query-admin-cabinet.dto';
@@ -35,6 +36,8 @@ type CabinetRow = {
   notes: string | null;
   inventoryCreatedAt: Date | string;
   inventoryUpdatedAt: Date | string;
+  searchScore?: number | string | null;
+  searchSource?: string | null;
 };
 
 type CountRow = { count: bigint | number | string };
@@ -145,6 +148,10 @@ export class CabinetService {
     const expireAt = dto.expireAt?.trim() || null;
     const source = dto.source?.trim() || 'manual';
     const notes = dto.notes?.trim() || null;
+    const embedding = this.buildMedicineEmbedding({
+      ...medicine,
+      notes,
+    });
 
     await this.prisma.$executeRaw(Prisma.sql`
       INSERT INTO household_medicine_inventory (
@@ -163,7 +170,8 @@ export class CabinetService {
         expire_at,
         source,
         notes,
-        created_by
+        created_by,
+        embedding
       )
       VALUES (
         ${id},
@@ -181,7 +189,8 @@ export class CabinetService {
         ${expireAt}::date,
         ${source},
         ${notes},
-        ${current.appUserId}
+        ${current.appUserId},
+        ${embedding}::vector
       )
     `);
 
@@ -190,6 +199,15 @@ export class CabinetService {
 
   async update(inventoryId: string, householdId: string, dto: UpdateCabinetInventoryDto) {
     const medicine = this.normalizeUpdateDto(dto);
+    const embedding = this.buildMedicineEmbedding({
+      name: medicine.name,
+      aliases: medicine.aliases,
+      indication: medicine.indication,
+      contraindication: medicine.contraindication,
+      adverseReaction: medicine.adverseReaction,
+      dosage: medicine.dosage,
+      notes: dto.notes?.trim() || null,
+    });
     const rows = await this.prisma.$queryRaw<CabinetRow[]>(Prisma.sql`
       UPDATE household_medicine_inventory
       SET
@@ -206,6 +224,7 @@ export class CabinetService {
         expire_at = COALESCE(${dto.expireAt?.trim() || null}::date, expire_at),
         source = COALESCE(${dto.source?.trim() || null}, source),
         notes = COALESCE(${dto.notes?.trim() || null}, notes),
+        embedding = COALESCE(${embedding}::vector, embedding),
         updated_at = now()
       WHERE id = ${inventoryId}
         AND household_id = ${householdId}
@@ -253,7 +272,12 @@ export class CabinetService {
     return { success: true };
   }
 
-  async findAgentBriefsByHousehold(householdId: string): Promise<AgentMedicineBrief[]> {
+  async findAgentBriefsByHousehold(householdId: string, query?: string): Promise<AgentMedicineBrief[]> {
+    const keyword = query?.trim();
+    if (keyword) {
+      return this.searchAgentBriefsByHousehold(householdId, keyword);
+    }
+
     const rows = await this.prisma.$queryRaw<CabinetRow[]>(Prisma.sql`
       SELECT ${SELECT_CABINET_COLUMNS}
       FROM household_medicine_inventory i
@@ -271,6 +295,74 @@ export class CabinetService {
       indication: row.indication,
       contraindication: row.contraindication,
       adverseReaction: row.adverseReaction,
+      dosage: row.dosage,
+    }));
+  }
+
+  private async searchAgentBriefsByHousehold(householdId: string, query: string): Promise<AgentMedicineBrief[]> {
+    const like = `%${query}%`;
+    const queryEmbedding = buildDeterministicEmbeddingText(query);
+    const rows = await this.prisma.$queryRaw<CabinetRow[]>(Prisma.sql`
+      WITH q AS (
+        SELECT
+          plainto_tsquery('simple', ${query}) AS text_query,
+          ${queryEmbedding}::vector AS embedding_query
+      )
+      SELECT
+        ${SELECT_CABINET_COLUMNS},
+        (
+          ts_rank_cd(i.search_vector, q.text_query) * 0.55
+          + CASE
+              WHEN i.embedding IS NOT NULL THEN (1 - (i.embedding <=> q.embedding_query)) * 0.35
+              ELSE 0
+            END
+          + CASE
+              WHEN i.name ILIKE ${like}
+                OR i.indication ILIKE ${like}
+                OR EXISTS (
+                  SELECT 1
+                  FROM unnest(i.aliases) alias
+                  WHERE alias ILIKE ${like}
+                )
+              THEN 0.10
+              ELSE 0
+            END
+        ) as "searchScore",
+        CASE
+          WHEN i.search_vector @@ q.text_query THEN 'fulltext'
+          WHEN i.embedding IS NOT NULL THEN 'vector'
+          ELSE 'keyword'
+        END as "searchSource"
+      FROM household_medicine_inventory i
+      CROSS JOIN q
+      WHERE i.household_id = ${householdId}
+        AND i.deleted_at IS NULL
+        AND i.quantity > 0
+        AND (
+          i.search_vector @@ q.text_query
+          OR i.name ILIKE ${like}
+          OR i.indication ILIKE ${like}
+          OR EXISTS (
+            SELECT 1
+            FROM unnest(i.aliases) alias
+            WHERE alias ILIKE ${like}
+          )
+          OR i.embedding IS NOT NULL
+        )
+      ORDER BY "searchScore" DESC, i.updated_at DESC
+      LIMIT 20
+    `);
+
+    return rows.map((row) => ({
+      id: row.medicineId,
+      name: row.name,
+      otc: row.otc,
+      indication: row.indication,
+      contraindication: row.contraindication,
+      adverseReaction: row.adverseReaction,
+      dosage: row.dosage,
+      searchScore: Number(row.searchScore ?? 0),
+      searchSource: row.searchSource ?? undefined,
     }));
   }
 
@@ -396,5 +488,18 @@ export class CabinetService {
       barcode: dto.barcode?.trim() || null,
       approvalNumber: dto.approvalNumber?.trim() || null,
     };
+  }
+
+  private buildMedicineEmbedding(input: {
+    name?: string | null;
+    aliases?: string[] | null;
+    indication?: string | null;
+    contraindication?: string | null;
+    adverseReaction?: string | null;
+    dosage?: string | null;
+    notes?: string | null;
+  }) {
+    const text = buildSearchText(input);
+    return text ? buildDeterministicEmbeddingText(text) : null;
   }
 }

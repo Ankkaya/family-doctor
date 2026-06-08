@@ -15,8 +15,10 @@ export function AppHeader({
   onBack: () => void;
   onNewChat: () => void;
 }) {
-  const showBack = activeTab === "dashboard" && currentScreen !== "dashboard-home";
-  const showNewChat = currentScreen === "chat";
+  const showBack =
+    (activeTab === "dashboard" && currentScreen !== "dashboard-home") ||
+    (activeTab === "chat" && currentScreen !== "chat-history");
+  const showNewChat = currentScreen === "chat-history";
 
   return (
     <header className="shrink-0 border-b border-slate-200/70 bg-white/85 px-3 pb-3 pt-3 backdrop-blur-md">
@@ -50,4 +52,3 @@ export function AppHeader({
     </header>
   );
 }
-

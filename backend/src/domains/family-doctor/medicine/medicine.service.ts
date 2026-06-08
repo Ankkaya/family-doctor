@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 import { AgentMedicineBrief } from '../agent-client/agent-client.types';
+import { buildDeterministicEmbeddingText, buildSearchText } from '../search/embedding.util';
 import { QueryMedicineDto } from './dto/query-medicine.dto';
 import { UpsertMedicineDto } from './dto/upsert-medicine.dto';
 import { MedicineCatalogItem, UserMedicineCabinetItem } from './medicine.types';
@@ -170,6 +171,7 @@ export class MedicineService {
   async create(dto: UpsertMedicineDto) {
     const id = randomUUID();
     const data = this.normalizeDto(dto);
+    const embedding = this.buildMedicineEmbedding(data);
     const rows = await this.prisma.$queryRaw<MedicineCatalogRow[]>(Prisma.sql`
       INSERT INTO medicine_catalog (
         id,
@@ -181,7 +183,8 @@ export class MedicineService {
         adverse_reaction,
         dosage,
         barcode,
-        approval_number
+        approval_number,
+        embedding
       )
       VALUES (
         ${id},
@@ -193,7 +196,8 @@ export class MedicineService {
         ${data.adverseReaction},
         ${data.dosage},
         ${data.barcode},
-        ${data.approvalNumber}
+        ${data.approvalNumber},
+        ${embedding}::vector
       )
       RETURNING ${SELECT_MEDICINE_COLUMNS}
     `);
@@ -204,6 +208,7 @@ export class MedicineService {
   async update(id: string, dto: UpsertMedicineDto) {
     await this.findOne(id);
     const data = this.normalizeDto(dto);
+    const embedding = this.buildMedicineEmbedding(data);
     const rows = await this.prisma.$queryRaw<MedicineCatalogRow[]>(Prisma.sql`
       UPDATE medicine_catalog
       SET
@@ -216,6 +221,7 @@ export class MedicineService {
         dosage = ${data.dosage},
         barcode = ${data.barcode},
         approval_number = ${data.approvalNumber},
+        embedding = ${embedding}::vector,
         updated_at = now()
       WHERE id = ${id}
       RETURNING ${SELECT_MEDICINE_COLUMNS}
@@ -304,5 +310,17 @@ export class MedicineService {
       ...row,
       aliases: row.aliases ?? [],
     };
+  }
+
+  private buildMedicineEmbedding(input: {
+    name?: string | null;
+    aliases?: string[] | null;
+    indication?: string | null;
+    contraindication?: string | null;
+    adverseReaction?: string | null;
+    dosage?: string | null;
+  }) {
+    const text = buildSearchText(input);
+    return text ? buildDeterministicEmbeddingText(text) : null;
   }
 }

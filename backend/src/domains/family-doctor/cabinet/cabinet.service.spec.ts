@@ -206,6 +206,7 @@ describe('CabinetService', () => {
         indication: '头痛',
         contraindication: '过敏者禁用',
         adverseReaction: null,
+        dosage: null,
       },
     ]);
   });

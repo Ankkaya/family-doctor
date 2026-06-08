@@ -50,6 +50,7 @@ const SELECT_APP_USER_COLUMNS = Prisma.sql`
   u.age,
   u.gender,
   u.allergies,
+  u.chronic_diseases as "chronicDiseases",
   u.medication_history as "medicationHistory",
   u.status,
   u.default_household_id as "defaultHouseholdId",

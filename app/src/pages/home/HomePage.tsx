@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { AppHeader } from "@/features/app-shell/AppHeader";
 import { BottomNav } from "@/features/app-shell/BottomNav";
 import { StatusBar } from "@/features/app-shell/StatusBar";
@@ -23,9 +23,10 @@ const screenTitleMap: Record<ScreenKey, string> = {
   "scan-entry": "扫描条形码",
   "medicine-list": "药品查询",
   "medicine-detail": "药品详情",
+  "chat-history": "寻药",
   "history-list": "对话历史",
   "history-detail": "历史详情",
-  chat: "寻药",
+  chat: "新对话",
   profile: "个人中心",
   "profile-settings": "个人信息",
   "app-settings": "系统设置",
@@ -82,6 +83,7 @@ export function HomePage() {
   const deleteMedicine = useAppStore((state) => state.deleteMedicine);
   const sendChat = useAppStore((state) => state.sendChat);
   const newChat = useAppStore((state) => state.newChat);
+  const [showProfilePrompt, setShowProfilePrompt] = useState(false);
 
   useEffect(() => {
     void initializeIdentity();
@@ -100,6 +102,33 @@ export function HomePage() {
   const filteredMedicines = medicines.filter((medicine) =>
     `${medicine.name}${medicine.indication}${medicine.otc}`.toLowerCase().includes(searchKeyword.toLowerCase()),
   );
+  const missingProfileFields = getMissingProfileFields(appUser);
+  const showBottomNav = currentScreen !== "chat";
+  const handleBack = () => {
+    if (activeTab === "chat") {
+      navigate("chat-history");
+      return;
+    }
+
+    backToDashboard();
+  };
+  const handleSendChat = () => {
+    if (missingProfileFields.length > 0) {
+      setShowProfilePrompt(true);
+      return;
+    }
+
+    void sendChat();
+  };
+  const continueChatWithoutProfile = () => {
+    setShowProfilePrompt(false);
+    void sendChat();
+  };
+  const openProfileSettings = () => {
+    setShowProfilePrompt(false);
+    setActiveTab("profile");
+    navigate("profile-settings");
+  };
 
   if (!authChecked || identityLoading) {
     return <LoadingShell />;
@@ -138,7 +167,7 @@ export function HomePage() {
           activeTab={activeTab}
           currentScreen={currentScreen}
           title={screenTitleMap[currentScreen]}
-          onBack={backToDashboard}
+          onBack={handleBack}
           onNewChat={newChat}
         />
         <div className="scrollbar-none flex-1 overflow-y-auto px-4 pb-6 pt-4">
@@ -178,6 +207,9 @@ export function HomePage() {
           {currentScreen === "history-list" && (
             <HistoryList sessions={historySessions} loading={historyLoading} onOpenHistory={openHistory} />
           )}
+          {currentScreen === "chat-history" && (
+            <HistoryList sessions={historySessions} loading={historyLoading} onOpenHistory={openHistory} />
+          )}
           {currentScreen === "history-detail" && (
             <HistoryDetail session={selectedHistory} medicines={medicines} onOpenMedicine={openMedicine} />
           )}
@@ -190,7 +222,7 @@ export function HomePage() {
               isSending={chatLoading}
               error={chatError}
               onInputChange={setChatInput}
-              onSend={sendChat}
+              onSend={handleSendChat}
               onOpenMedicine={openMedicine}
             />
           )}
@@ -225,9 +257,94 @@ export function HomePage() {
             />
           )}
         </div>
-        <BottomNav activeTab={activeTab} onChange={setActiveTab} />
+        {showBottomNav ? <BottomNav activeTab={activeTab} onChange={setActiveTab} /> : null}
       </div>
+      {showProfilePrompt ? (
+        <ProfileCompletenessPrompt
+          missingFields={missingProfileFields}
+          onComplete={openProfileSettings}
+          onContinue={continueChatWithoutProfile}
+          onClose={() => setShowProfilePrompt(false)}
+        />
+      ) : null}
     </main>
+  );
+}
+
+function getMissingProfileFields(user?: {
+  age?: number | null;
+  gender?: string | null;
+  allergies?: string | null;
+  chronicDiseases?: string | null;
+  medicationHistory?: string | null;
+}) {
+  const missing: string[] = [];
+
+  if (user?.age == null) missing.push("年龄");
+  if (!user?.gender || user.gender === "unknown") missing.push("性别");
+  if (!hasProfileText(user?.allergies)) missing.push("过敏史");
+  if (!hasProfileText(user?.chronicDiseases)) missing.push("基础病");
+  if (!hasProfileText(user?.medicationHistory)) missing.push("长期用药");
+
+  return missing;
+}
+
+function hasProfileText(value?: string | null) {
+  return Boolean(value?.trim());
+}
+
+function ProfileCompletenessPrompt({
+  missingFields,
+  onComplete,
+  onContinue,
+  onClose,
+}: {
+  missingFields: string[];
+  onComplete: () => void;
+  onContinue: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 px-4">
+      <section className="w-full max-w-sm rounded-[1.5rem] bg-white p-5 shadow-[0_24px_80px_rgba(15,23,42,0.26)]">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-base font-semibold text-slate-950">补充基础信息</p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              完善年龄、性别、过敏史、基础病和长期用药，有助于提高寻药推荐准确性。
+            </p>
+          </div>
+          <button
+            type="button"
+            aria-label="关闭"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-slate-400 active:bg-slate-100"
+            onClick={onClose}
+          >
+            ×
+          </button>
+        </div>
+        <div className="mt-4 rounded-2xl bg-slate-50 px-3 py-3">
+          <p className="text-xs font-semibold text-slate-500">待补充</p>
+          <p className="mt-1 text-sm font-medium leading-6 text-slate-800">{missingFields.join("、")}</p>
+        </div>
+        <div className="mt-5 grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            className="h-11 rounded-2xl border border-slate-200 bg-white text-sm font-semibold text-slate-700"
+            onClick={onContinue}
+          >
+            继续提问
+          </button>
+          <button
+            type="button"
+            className="h-11 rounded-2xl bg-slate-950 text-sm font-semibold text-white"
+            onClick={onComplete}
+          >
+            去补充
+          </button>
+        </div>
+      </section>
+    </div>
   );
 }
 

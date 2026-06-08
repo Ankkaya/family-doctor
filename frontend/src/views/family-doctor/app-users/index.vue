@@ -94,7 +94,10 @@
         <n-descriptions-item label="过敏史">
           <span class="profile-text">{{ currentProfile.allergies || '-' }}</span>
         </n-descriptions-item>
-        <n-descriptions-item label="曾用药">
+        <n-descriptions-item label="基础病">
+          <span class="profile-text">{{ currentProfile.chronicDiseases || '-' }}</span>
+        </n-descriptions-item>
+        <n-descriptions-item label="长期用药">
           <span class="profile-text">{{ currentProfile.medicationHistory || '-' }}</span>
         </n-descriptions-item>
       </n-descriptions>

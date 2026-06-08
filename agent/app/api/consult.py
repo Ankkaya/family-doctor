@@ -13,6 +13,7 @@ async def consult(payload: ConsultRequest, request: Request) -> ConsultResponse:
             "session_id": payload.session_id,
             "question": payload.question,
             "medicines": payload.medicines,
+            "user_profile": payload.user_profile,
             "allow_rx_recommendation": payload.allow_rx_recommendation,
             "traces": [],
         }

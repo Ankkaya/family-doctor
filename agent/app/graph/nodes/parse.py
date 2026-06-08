@@ -20,7 +20,7 @@ PARSE_SYSTEM = (
 
 def make_parse_node(llm: LLMProvider):
     async def parse(state: dict[str, Any]) -> dict[str, Any]:
-        question: str = state["question"]
+        question: str = state.get("normalized_question") or state["question"]
         with trace_node("parse", {"question": question}) as rec:
             parsed = await llm.structured(
                 system=PARSE_SYSTEM,

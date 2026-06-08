@@ -32,6 +32,7 @@ const APP_USER_PROFILE_SELECT = {
   age: true,
   gender: true,
   allergies: true,
+  chronicDiseases: true,
   medicationHistory: true,
   defaultHouseholdId: true,
 } satisfies Prisma.AppUserSelect;
@@ -203,6 +204,9 @@ export class AppAuthService {
     if ('age' in dto) data.age = dto.age ?? null;
     if ('gender' in dto) data.gender = dto.gender ?? null;
     if ('allergies' in dto) data.allergies = this.normalizeOptionalText(dto.allergies);
+    if ('chronicDiseases' in dto) {
+      data.chronicDiseases = this.normalizeOptionalText(dto.chronicDiseases);
+    }
     if ('medicationHistory' in dto) {
       data.medicationHistory = this.normalizeOptionalText(dto.medicationHistory);
     }

@@ -3,7 +3,7 @@ import { randomUUID } from 'crypto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 import { AgentClientService } from '../agent-client/agent-client.service';
-import { AgentTraceStep } from '../agent-client/agent-client.types';
+import { AgentTraceStep, AgentUserProfile } from '../agent-client/agent-client.types';
 import { CabinetService } from '../cabinet/cabinet.service';
 import { CurrentHousehold } from '@/domains/households/households.service';
 import { AskConsultationDto } from './dto/ask-consultation.dto';
@@ -81,11 +81,15 @@ export class ConsultationService {
       recommends: null,
     });
 
-    const medicines = await this.cabinetService.findAgentBriefsByHousehold(current.householdId);
+    const [medicines, userProfile] = await Promise.all([
+      this.cabinetService.findAgentBriefsByHousehold(current.householdId, question),
+      this.findAgentUserProfile(current.appUserId),
+    ]);
     const agentResponse = await this.agentClient.consult({
       sessionId,
       question,
       medicines,
+      userProfile,
       allowRxRecommendation: dto.allowRxRecommendation === true,
     });
 
@@ -352,6 +356,24 @@ export class ConsultationService {
         )
       `);
     }
+  }
+
+  private async findAgentUserProfile(appUserId: string): Promise<AgentUserProfile | null> {
+    const user = await this.prisma.appUser.findFirst({
+      where: {
+        id: appUserId,
+        deletedAt: null,
+      },
+      select: {
+        age: true,
+        gender: true,
+        allergies: true,
+        chronicDiseases: true,
+        medicationHistory: true,
+      },
+    });
+
+    return user;
   }
 
   private buildSessionWhere(input: { keyword?: string; householdId?: string; userId?: string }) {

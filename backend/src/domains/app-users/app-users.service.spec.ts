@@ -80,6 +80,7 @@ describe('AppUsersService', () => {
     expect(listQuery).toContain('u.age');
     expect(listQuery).toContain('u.gender');
     expect(listQuery).toContain('u.allergies');
+    expect(listQuery).toContain('chronic_diseases');
     expect(listQuery).toContain('medication_history');
   });
 });

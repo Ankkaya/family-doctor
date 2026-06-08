@@ -27,7 +27,13 @@ export class UpdateAppProfileDto {
   @MaxLength(2000)
   allergies?: string;
 
-  @ApiPropertyOptional({ description: '曾用药' })
+  @ApiPropertyOptional({ description: '基础病' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  chronicDiseases?: string;
+
+  @ApiPropertyOptional({ description: '长期用药' })
   @IsOptional()
   @IsString()
   @MaxLength(2000)

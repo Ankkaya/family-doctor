@@ -20,6 +20,7 @@ export type ScreenKey =
   | "scan-entry"
   | "medicine-list"
   | "medicine-detail"
+  | "chat-history"
   | "history-list"
   | "history-detail"
   | "chat"
@@ -103,7 +104,7 @@ const emptyRuntimeState = {
 const ALLOW_RX_RECOMMENDATION_KEY = "allow_rx_recommendation";
 
 function tabToScreen(tab: TabKey): ScreenKey {
-  if (tab === "chat") return "chat";
+  if (tab === "chat") return "chat-history";
   if (tab === "profile") return "profile";
   return "dashboard-home";
 }
@@ -173,7 +174,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({
       selectedHistoryId: historyId,
       currentScreen: "history-detail",
-      activeTab: "dashboard",
+      activeTab: get().activeTab === "chat" ? "chat" : "dashboard",
       historyError: undefined,
     });
 
@@ -437,7 +438,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     set({ historyLoading: true, historyError: undefined });
     try {
-      const remoteHistory = await appApi.listHistory({ page: 1, pageSize: 50 });
+      const remoteHistory = await appApi.listHistory({ page: 1, pageSize: 100 });
       set({
         historySessions: remoteHistory,
         selectedHistoryId: remoteHistory.some((item) => item.id === get().selectedHistoryId)

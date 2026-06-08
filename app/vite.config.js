@@ -8,6 +8,8 @@ export default defineConfig(function (_a) {
     var hmrHost = env.VITE_HMR_HOST ||
         process.env.VITE_HMR_HOST ||
         (host === "0.0.0.0" ? "localhost" : host);
+    var disableCustomHmr = env.VITE_DISABLE_CUSTOM_HMR === "true" ||
+        process.env.VITE_DISABLE_CUSTOM_HMR === "true";
     var apiProxyTarget = env.VITE_API_PROXY_TARGET || "http://127.0.0.1:13001";
     var stripApiPrefix = env.VITE_API_PROXY_STRIP_PREFIX !== "false";
     return {
@@ -30,7 +32,7 @@ export default defineConfig(function (_a) {
                     },
                 },
             },
-            hmr: hmrHost
+            hmr: !disableCustomHmr && hmrHost
                 ? {
                     protocol: "ws",
                     host: hmrHost,
