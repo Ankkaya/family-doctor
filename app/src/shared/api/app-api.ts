@@ -28,6 +28,23 @@ type BackendMedicine = {
   source?: string | null;
 };
 
+type BackendRecognizedMedicine = {
+  name?: string | null;
+  aliases?: string[] | null;
+  otc?: BackendOtcType | null;
+  indication?: string | null;
+  contraindication?: string | null;
+  adverseReaction?: string | null;
+  dosage?: string | null;
+  barcode?: string | null;
+  approvalNumber?: string | null;
+  manufacturer?: string | null;
+  expireAt?: string | null;
+  confidence?: number | null;
+  rawText?: string | null;
+  warnings?: string[] | null;
+};
+
 export type CabinetMedicineInput = {
   name: string;
   aliases?: string[];
@@ -167,6 +184,40 @@ export type AskConsultationResponse = {
   answer: string;
   recommends: ConsultationRecommend[];
   disclaimer: string;
+};
+
+export type AskConsultationStreamEvent =
+  | {
+      type: "session";
+      sessionId: string;
+      messageId: string;
+    }
+  | {
+      type: "status";
+      stage: "prepare" | "lookup" | "agent" | "fallback" | "finalize";
+      message: string;
+    }
+  | {
+      type: "answer_delta";
+      delta: string;
+    }
+  | {
+      type: "complete";
+      sessionId: string;
+      messageId: string;
+      answer: string;
+      recommends: ConsultationRecommend[];
+      disclaimer: string;
+    }
+  | {
+      type: "error";
+      message: string;
+    };
+
+export type RecognizedMedicineResult = Medicine & {
+  confidence?: number;
+  rawText?: string;
+  warnings?: string[];
 };
 
 let sessionState: AppSessionState | null = null;
@@ -319,6 +370,27 @@ function toAppMedicine(item: BackendMedicine): Medicine {
   };
 }
 
+function toRecognizedMedicine(item: BackendRecognizedMedicine): RecognizedMedicineResult {
+  return {
+    id: `recognized-${Date.now()}`,
+    name: item.name?.trim() || "未识别药品名称",
+    expiry: formatDate(item.expireAt),
+    indication: item.indication?.trim() || "暂无适应症记录",
+    contraindications: item.contraindication?.trim() || "暂无禁忌人群记录",
+    adverseReactions: item.adverseReaction?.trim() || "暂无不良反应记录",
+    otc: item.otc === "RX" ? "Rx" : "OTC",
+    barcode: item.barcode?.trim() || "-",
+    approvalNumber: item.approvalNumber?.trim() || undefined,
+    dosage: item.dosage?.trim() || undefined,
+    manufacturer: item.manufacturer?.trim() || undefined,
+    source: "图片识别",
+    quantity: 1,
+    confidence: item.confidence ?? undefined,
+    rawText: item.rawText?.trim() || undefined,
+    warnings: item.warnings?.filter(Boolean) ?? undefined,
+  };
+}
+
 function isBackendRecommendList(value: unknown): value is BackendConsultationRecommend[] {
   return Array.isArray(value);
 }
@@ -374,6 +446,7 @@ export const appApi = {
   async login(input: { username: string; password: string }) {
     const auth = await httpClient.postJson<AppAuthResponse>("/app/auth/login", input, {
       skipAppAuth: true,
+      suppressErrorToast: true,
     });
     return persistSession(auth);
   },
@@ -381,6 +454,7 @@ export const appApi = {
   async register(input: { username: string; password: string; registrationCode: string }) {
     const auth = await httpClient.postJson<AppAuthResponse>("/app/auth/register", input, {
       skipAppAuth: true,
+      suppressErrorToast: true,
     });
     return persistSession(auth);
   },
@@ -489,6 +563,22 @@ export const appApi = {
 
   async ask(input: AskConsultationInput) {
     return httpClient.postJson<AskConsultationResponse>("/consultation/ask", input);
+  },
+
+  async askStream(
+    input: AskConsultationInput,
+    onEvent: (event: AskConsultationStreamEvent) => void | Promise<void>,
+  ) {
+    return httpClient.postJsonStream<AskConsultationStreamEvent>("/consultation/ask/stream", input, onEvent);
+  },
+
+  async recognizeMedicineImages(files: File[]) {
+    const formData = new FormData();
+    files.forEach((file) => {
+      formData.append("files", file);
+    });
+    const response = await httpClient.postForm<BackendRecognizedMedicine>("/medicine/recognize-images", formData);
+    return toRecognizedMedicine(response);
   },
 
   async addCabinetMedicine(input: CabinetMedicineInput) {

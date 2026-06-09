@@ -2,11 +2,13 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service';
-import { AgentMedicineBrief } from '../agent-client/agent-client.types';
+import { BufferedFile } from '@/infrastructure/minio/dto/file.dto';
+import { AgentClientService } from '../agent-client/agent-client.service';
+import { AgentMedicineBrief, AgentRecognizeMedicineImageOutput } from '../agent-client/agent-client.types';
 import { buildDeterministicEmbeddingText, buildSearchText } from '../search/embedding.util';
 import { QueryMedicineDto } from './dto/query-medicine.dto';
 import { UpsertMedicineDto } from './dto/upsert-medicine.dto';
-import { MedicineCatalogItem, UserMedicineCabinetItem } from './medicine.types';
+import { MedicineCatalogItem, RecognizedMedicineItem, UserMedicineCabinetItem } from './medicine.types';
 
 type MedicineCatalogRow = MedicineCatalogItem;
 type UserMedicineCabinetRow = UserMedicineCabinetItem;
@@ -53,7 +55,10 @@ const SELECT_USER_CABINET_COLUMNS = Prisma.sql`
 
 @Injectable()
 export class MedicineService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly agentClient: AgentClientService,
+  ) {}
 
   async findCatalog(query: QueryMedicineDto) {
     const page = query.page ?? 1;
@@ -100,6 +105,19 @@ export class MedicineService {
     }
 
     return this.normalizeRow(item);
+  }
+
+  async recognizeFromImages(files: BufferedFile[]): Promise<RecognizedMedicineItem> {
+    const recognized = await this.agentClient.recognizeMedicineImages({
+      images: files.map((file) => ({
+        filename: file.originalname,
+        mimeType: file.mimetype,
+        dataBase64: file.buffer.toString('base64'),
+      })),
+    });
+
+    const matchedCatalogItem = await this.findCatalogMatch(recognized);
+    return this.normalizeRecognizedMedicine(recognized, matchedCatalogItem);
   }
 
   async findUserCabinet(query: QueryMedicineDto, devUserId = 'local-dev') {
@@ -310,6 +328,83 @@ export class MedicineService {
       ...row,
       aliases: row.aliases ?? [],
     };
+  }
+
+  private async findCatalogMatch(recognized: AgentRecognizeMedicineImageOutput) {
+    if (recognized.barcode?.trim()) {
+      const rows = await this.prisma.$queryRaw<MedicineCatalogRow[]>(Prisma.sql`
+        SELECT ${SELECT_MEDICINE_COLUMNS}
+        FROM medicine_catalog
+        WHERE barcode = ${recognized.barcode.trim()}
+        LIMIT 1
+      `);
+      if (rows[0]) return this.normalizeRow(rows[0]);
+    }
+
+    if (recognized.approvalNumber?.trim()) {
+      const rows = await this.prisma.$queryRaw<MedicineCatalogRow[]>(Prisma.sql`
+        SELECT ${SELECT_MEDICINE_COLUMNS}
+        FROM medicine_catalog
+        WHERE approval_number = ${recognized.approvalNumber.trim()}
+        LIMIT 1
+      `);
+      if (rows[0]) return this.normalizeRow(rows[0]);
+    }
+
+    if (recognized.name?.trim()) {
+      const like = `%${recognized.name.trim()}%`;
+      const rows = await this.prisma.$queryRaw<MedicineCatalogRow[]>(Prisma.sql`
+        SELECT ${SELECT_MEDICINE_COLUMNS}
+        FROM medicine_catalog
+        WHERE name ILIKE ${like}
+        ORDER BY updated_at DESC
+        LIMIT 1
+      `);
+      if (rows[0]) return this.normalizeRow(rows[0]);
+    }
+
+    return null;
+  }
+
+  private normalizeRecognizedMedicine(
+    recognized: AgentRecognizeMedicineImageOutput,
+    matchedCatalogItem: MedicineCatalogItem | null,
+  ): RecognizedMedicineItem {
+    return {
+      name: recognized.name?.trim() || matchedCatalogItem?.name || '未识别药品名称',
+      aliases: recognized.aliases?.map((item) => item.trim()).filter(Boolean) || matchedCatalogItem?.aliases || [],
+      otc: recognized.otc || matchedCatalogItem?.otc || 'OTC',
+      indication: recognized.indication?.trim() || matchedCatalogItem?.indication || null,
+      contraindication: recognized.contraindication?.trim() || matchedCatalogItem?.contraindication || null,
+      adverseReaction: recognized.adverseReaction?.trim() || matchedCatalogItem?.adverseReaction || null,
+      dosage: recognized.dosage?.trim() || matchedCatalogItem?.dosage || null,
+      barcode: recognized.barcode?.trim() || matchedCatalogItem?.barcode || null,
+      approvalNumber: recognized.approvalNumber?.trim() || matchedCatalogItem?.approvalNumber || null,
+      manufacturer: recognized.manufacturer?.trim() || null,
+      expireAt: this.normalizeExpireAt(recognized.expireAt),
+      confidence: typeof recognized.confidence === 'number' ? recognized.confidence : null,
+      rawText: recognized.rawText?.trim() || null,
+      warnings: recognized.warnings?.map((item) => item.trim()).filter(Boolean) || [],
+    };
+  }
+
+  private normalizeExpireAt(value?: string | null) {
+    if (!value) return null;
+    const normalized = value.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+      return normalized;
+    }
+    if (/^\d{4}[./年-]\d{1,2}[./月-]\d{1,2}日?$/.test(normalized)) {
+      return normalized
+        .replace(/年|\./g, '-')
+        .replace(/月/g, '-')
+        .replace(/日/g, '')
+        .replace(/\//g, '-')
+        .split('-')
+        .map((segment, index) => (index === 0 ? segment : segment.padStart(2, '0')))
+        .join('-');
+    }
+    return normalized;
   }
 
   private buildMedicineEmbedding(input: {

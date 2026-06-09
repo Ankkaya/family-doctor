@@ -46,3 +46,43 @@ class OpenAICompatProvider:
         )
         raw = resp.choices[0].message.content or "{}"
         return schema.model_validate_json(raw)
+
+    async def structured_with_images(
+        self,
+        *,
+        system: str,
+        user: str,
+        images: list[dict[str, str]],
+        schema: type[T],
+    ) -> T:
+        sys_with_schema = (
+            f"{system}\n\n"
+            "请严格以 JSON 返回，字段遵循以下 JSON Schema：\n"
+            f"{json.dumps(schema.model_json_schema(), ensure_ascii=False)}"
+        )
+        user_content: list[dict[str, object]] = [
+            {
+                "type": "text",
+                "text": user,
+            }
+        ]
+        user_content.extend(
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": image["url"],
+                },
+            }
+            for image in images
+        )
+        resp = await self._client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": sys_with_schema},
+                {"role": "user", "content": user_content},
+            ],
+            temperature=0.1,
+            response_format={"type": "json_object"},
+        )
+        raw = resp.choices[0].message.content or "{}"
+        return schema.model_validate_json(raw)

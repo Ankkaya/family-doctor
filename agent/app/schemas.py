@@ -67,6 +67,33 @@ class ConsultResponse(_CamelModel):
     traces: list[TraceStep]
 
 
+class ImageInput(_CamelModel):
+    filename: str
+    mime_type: str = Field(alias="mimeType")
+    data_base64: str = Field(alias="dataBase64")
+
+
+class RecognizeMedicineImagesRequest(_CamelModel):
+    images: list[ImageInput] = Field(default_factory=list)
+
+
+class RecognizeMedicineImagesResponse(_CamelModel):
+    name: str | None = None
+    aliases: list[str] = Field(default_factory=list)
+    otc: OtcType | None = None
+    indication: str | None = None
+    contraindication: str | None = None
+    adverse_reaction: str | None = Field(default=None, alias="adverseReaction")
+    dosage: str | None = None
+    barcode: str | None = None
+    approval_number: str | None = Field(default=None, alias="approvalNumber")
+    manufacturer: str | None = None
+    expire_at: str | None = Field(default=None, alias="expireAt")
+    confidence: float | None = None
+    raw_text: str | None = Field(default=None, alias="rawText")
+    warnings: list[str] = Field(default_factory=list)
+
+
 class ParsedSymptoms(_CamelModel):
     symptoms: list[str]
     severity: Literal["mild", "moderate", "severe", "unknown"] = "unknown"

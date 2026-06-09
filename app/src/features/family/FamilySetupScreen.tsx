@@ -36,9 +36,9 @@ export function FamilySetupScreen({
   };
 
   return (
-    <main className="h-[100dvh] overflow-hidden bg-[linear-gradient(180deg,_#eef8f4_0%,_#f8fafc_48%,_#ffffff_100%)] px-3 py-4 text-foreground">
-      <div className="mx-auto flex h-[calc(100dvh-2rem)] w-full max-w-md flex-col overflow-hidden rounded-[2.15rem] border border-white/70 bg-white shadow-[0_28px_100px_rgba(15,23,42,0.14)] ring-1 ring-slate-200/70">
-        <div className="scrollbar-none flex-1 overflow-y-auto px-6 py-8">
+    <main className="h-[100dvh] overflow-hidden bg-white text-foreground">
+      <div className="mx-auto flex h-full w-full max-w-md flex-col overflow-hidden bg-white">
+        <div className="scrollbar-none flex-1 overflow-y-auto px-6 pb-8 pt-[calc(env(safe-area-inset-top)+2rem)]">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-sm font-semibold text-emerald-700">家庭管理</p>

@@ -20,6 +20,9 @@ export function MessageList({
   isLoading?: boolean;
   onOpenMedicine: (medicineId: string) => void;
 }) {
+  const latestMessage = messages[messages.length - 1];
+  const showLoadingBubble = isLoading && !(latestMessage?.role === "assistant");
+
   if (messages.length === 0 && !isLoading) {
     return null;
   }
@@ -87,7 +90,7 @@ export function MessageList({
           </div>
         );
       })}
-      {isLoading ? <AssistantLoadingMessage /> : null}
+      {showLoadingBubble ? <AssistantLoadingMessage /> : null}
     </div>
   );
 }
@@ -97,6 +100,11 @@ function MessageText({ message }: { message: ChatMessage }) {
 
   return (
     <>
+      {message.statusText ? (
+        <p className="mb-2 text-xs leading-5 text-slate-500">
+          {message.statusText}
+        </p>
+      ) : null}
       <p className="whitespace-pre-line text-sm leading-6">{message.text}</p>
       {disclaimer ? (
         <p className="mt-3 border-t border-amber-100 pt-2 text-xs leading-5 text-amber-700">

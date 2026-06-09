@@ -31,9 +31,9 @@ export function AuthScreen({
   };
 
   return (
-    <main className="h-[100dvh] overflow-hidden bg-[linear-gradient(180deg,_#e8f6f2_0%,_#f8fbfc_46%,_#ffffff_100%)] px-3 py-4 text-foreground">
-      <div className="mx-auto flex h-[calc(100dvh-2rem)] w-full max-w-md flex-col overflow-hidden rounded-[2.15rem] border border-white/70 bg-white shadow-[0_28px_100px_rgba(15,23,42,0.14)] ring-1 ring-slate-200/70">
-        <div className="flex flex-1 flex-col justify-center px-6 py-8">
+    <main className="h-[100dvh] overflow-hidden bg-white text-foreground">
+      <div className="mx-auto flex h-full w-full max-w-md flex-col overflow-hidden bg-white">
+        <div className="flex flex-1 flex-col justify-center px-6 pb-8 pt-[calc(env(safe-area-inset-top)+2rem)]">
           <div className="flex flex-col items-center text-center">
             <div className="flex h-28 w-28 items-center justify-center rounded-[2rem] bg-emerald-50 shadow-[inset_0_0_0_1px_rgba(15,118,110,0.08)]">
               <AppBrandIcon
@@ -93,11 +93,17 @@ export function AuthScreen({
               </label>
             ) : null}
 
-            {error ? (
-              <div className="rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-700">
-                {error}
-              </div>
-            ) : null}
+            <div
+              aria-live="polite"
+              className={[
+                "min-h-10 rounded-xl border px-3 py-2 text-sm transition-colors",
+                error
+                  ? "border-red-100 bg-red-50 text-red-700"
+                  : "border-transparent bg-transparent text-transparent",
+              ].join(" ")}
+            >
+              {error || " "}
+            </div>
 
             <Button className="h-12 w-full rounded-xl" disabled={loading}>
               {loading ? "提交中" : mode === "login" ? "登录" : "注册"}

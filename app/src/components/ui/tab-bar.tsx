@@ -30,7 +30,7 @@ export function TabBar<K extends string>({
   return (
     <nav
       className={cn(
-        "shrink-0 border-t border-slate-200/70 bg-white/90 px-3 py-1.5 backdrop-blur-md",
+        "shrink-0 border-t border-slate-200/70 bg-white/90 px-3 pb-[calc(env(safe-area-inset-bottom)+0.375rem)] pt-1.5 backdrop-blur-md",
         className,
       )}
     >

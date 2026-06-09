@@ -52,3 +52,42 @@ export type AgentConsultOutput = {
   disclaimer: string;
   traces: AgentTraceStep[];
 };
+
+export type AgentConsultStreamEvent =
+  | {
+      type: 'status';
+      stage?: string;
+      message: string;
+    }
+  | {
+      type: 'answer_delta';
+      delta: string;
+    }
+  | ({
+      type: 'complete';
+    } & AgentConsultOutput);
+
+export type AgentRecognizeMedicineImageInput = {
+  images: Array<{
+    filename: string;
+    mimeType: string;
+    dataBase64: string;
+  }>;
+};
+
+export type AgentRecognizeMedicineImageOutput = {
+  name?: string | null;
+  aliases?: string[] | null;
+  otc?: 'OTC' | 'RX' | null;
+  indication?: string | null;
+  contraindication?: string | null;
+  adverseReaction?: string | null;
+  dosage?: string | null;
+  barcode?: string | null;
+  approvalNumber?: string | null;
+  manufacturer?: string | null;
+  expireAt?: string | null;
+  confidence?: number | null;
+  rawText?: string | null;
+  warnings?: string[] | null;
+};

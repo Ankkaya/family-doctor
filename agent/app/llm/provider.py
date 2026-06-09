@@ -16,6 +16,15 @@ class LLMProvider(Protocol):
 
     async def structured(self, *, system: str, user: str, schema: type[T]) -> T: ...
 
+    async def structured_with_images(
+        self,
+        *,
+        system: str,
+        user: str,
+        images: list[dict[str, str]],
+        schema: type[T],
+    ) -> T: ...
+
 
 def get_llm_provider(settings: Settings) -> LLMProvider:
     if settings.llm_provider == "openai":

@@ -15,6 +15,7 @@ type ApiEnvelope<T> = {
 
 type HttpRequestInit = RequestInit & {
   skipAppAuth?: boolean;
+  suppressErrorToast?: boolean;
 };
 
 type AuthHeadersProvider = () => Promise<Record<string, string>> | Record<string, string>;
@@ -64,10 +65,26 @@ async function request(input: string | URL, init?: HttpRequestInit) {
     headers: mergeHeaders(authHeaders, init?.headers),
   };
   delete requestInit.skipAppAuth;
+  delete requestInit.suppressErrorToast;
 
   if (isTauri()) {
     return tauriFetch(url, requestInit);
   }
+
+  return fetch(url, requestInit);
+}
+
+async function requestStream(input: string | URL, init?: HttpRequestInit) {
+  const url = resolveUrl(input);
+  const authHeaders = init?.skipAppAuth || !authHeadersProvider
+    ? {}
+    : await authHeadersProvider();
+  const requestInit = {
+    ...init,
+    headers: mergeHeaders(authHeaders, init?.headers),
+  };
+  delete requestInit.skipAppAuth;
+  delete requestInit.suppressErrorToast;
 
   return fetch(url, requestInit);
 }
@@ -83,7 +100,9 @@ async function requestJson<T>(input: string | URL, init: HttpRequestInit) {
     return unwrapResponse<T>(data);
   } catch (error) {
     const apiError = toApiError(error);
-    showErrorToast(apiError.message);
+    if (!init.suppressErrorToast) {
+      showErrorToast(apiError.message);
+    }
     throw apiError;
   }
 }
@@ -137,5 +156,65 @@ export const httpClient = {
       method: "DELETE",
       ...init,
     });
+  },
+
+  async postJsonStream<T>(
+    input: string | URL,
+    body: unknown,
+    onEvent: (event: T) => void | Promise<void>,
+    init?: HttpRequestInit,
+  ) {
+    try {
+      const response = await requestStream(input, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/x-ndjson",
+          ...(init?.headers ?? {}),
+        },
+        body: body ? JSON.stringify(body) : undefined,
+        ...init,
+      });
+
+      if (!response.ok) {
+        throw await createApiErrorFromResponse(response);
+      }
+
+      if (!response.body) {
+        throw new Error("当前环境不支持流式响应");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
+
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const rawLine of lines) {
+          const line = rawLine.trim();
+          if (!line) continue;
+          await onEvent(JSON.parse(line) as T);
+        }
+
+        if (done) {
+          break;
+        }
+      }
+
+      if (buffer.trim()) {
+        await onEvent(JSON.parse(buffer.trim()) as T);
+      }
+    } catch (error) {
+      const apiError = toApiError(error);
+      if (!init?.suppressErrorToast) {
+        showErrorToast(apiError.message);
+      }
+      throw apiError;
+    }
   },
 };

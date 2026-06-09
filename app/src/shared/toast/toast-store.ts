@@ -1,6 +1,6 @@
 export type ToastMessage = {
   id: number;
-  tone: "error";
+  tone: "error" | "info";
   message: string;
 };
 
@@ -16,12 +16,20 @@ function emit() {
 }
 
 export function showErrorToast(message: string, duration = 3200) {
+  showToast(message, "error", duration);
+}
+
+export function showInfoToast(message: string, duration = 2200) {
+  showToast(message, "info", duration);
+}
+
+function showToast(message: string, tone: ToastMessage["tone"], duration: number) {
   const normalizedMessage = message.trim();
   if (!normalizedMessage) return;
 
   const toast = {
     id: nextToastId,
-    tone: "error" as const,
+    tone,
     message: normalizedMessage,
   };
   nextToastId += 1;

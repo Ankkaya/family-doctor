@@ -1,6 +1,14 @@
 import { create } from "zustand";
 import { appApi } from "@/shared/api/app-api";
-import type { AppHousehold, AppHouseholdMember, AppProfileInput, AppUser, CabinetMedicineInput } from "@/shared/api/app-api";
+import type {
+  AppHousehold,
+  AppHouseholdMember,
+  AppProfileInput,
+  AppUser,
+  AskConsultationStreamEvent,
+  CabinetMedicineInput,
+  RecognizedMedicineResult,
+} from "@/shared/api/app-api";
 import { appStore } from "@/shared/storage/app-store";
 import {
   type ChatMessage,
@@ -43,6 +51,7 @@ type AppState = {
   chatInput: string;
   chatMessages: ChatMessage[];
   medicines: Medicine[];
+  recognizedMedicine?: RecognizedMedicineResult | null;
   historySessions: HistorySession[];
   activeSessionId?: string;
   appUser?: AppUser;
@@ -60,6 +69,8 @@ type AppState = {
   chatLoading: boolean;
   chatError?: string;
   medicinesLoading: boolean;
+  recognitionLoading: boolean;
+  recognitionError?: string;
   historyLoading: boolean;
   historyError?: string;
   setActiveTab: (tab: TabKey) => void;
@@ -82,6 +93,8 @@ type AppState = {
   uploadAvatar: (file: File) => Promise<AppUser>;
   setAllowRxRecommendation: (value: boolean) => Promise<void>;
   loadMedicines: () => Promise<void>;
+  recognizeMedicineImages: (files: File[]) => Promise<RecognizedMedicineResult>;
+  clearRecognizedMedicine: () => void;
   loadHistory: () => Promise<void>;
   saveRecognizedMedicine: (medicine?: Medicine) => Promise<void>;
   updateMedicine: (medicineId: string, medicine: Medicine) => Promise<void>;
@@ -97,6 +110,7 @@ const emptyRuntimeState = {
   chatInput: "",
   chatMessages: [] as ChatMessage[],
   medicines: [] as Medicine[],
+  recognizedMedicine: null as RecognizedMedicineResult | null,
   historySessions: [] as HistorySession[],
   activeSessionId: undefined,
 };
@@ -121,6 +135,41 @@ function formatCurrentTime() {
   }).format(new Date());
 }
 
+function toChatCardsFromRecommends(
+  recommends: Array<{
+    medicineId: string;
+    name: string;
+    otc: "OTC" | "RX";
+    indication: string;
+    reason: string;
+    warnings: string[];
+  }>,
+) {
+  const cards = recommends.map((recommend) => ({
+    medicineId: recommend.medicineId,
+    name: recommend.name,
+    otc: recommend.otc === "RX" ? "Rx" as const : "OTC" as const,
+    indication: recommend.indication,
+    summary: [
+      recommend.reason,
+      ...recommend.warnings.map((warning) => `风险提示：${warning}`),
+    ].join("；"),
+    warnings: recommend.warnings,
+  }));
+
+  return cards.length > 0 ? cards : undefined;
+}
+
+function updateStreamingAssistant(
+  messages: ChatMessage[],
+  placeholderId: string,
+  updater: (message: ChatMessage) => ChatMessage,
+) {
+  return messages.map((message) => (
+    message.id === placeholderId ? updater(message) : message
+  ));
+}
+
 function toCabinetMedicineInput(medicine: Medicine): CabinetMedicineInput {
   return {
     name: medicine.name,
@@ -129,7 +178,9 @@ function toCabinetMedicineInput(medicine: Medicine): CabinetMedicineInput {
     indication: medicine.indication,
     contraindication: medicine.contraindications,
     adverseReaction: medicine.adverseReactions,
+    dosage: medicine.dosage,
     barcode: medicine.barcode === "-" ? undefined : medicine.barcode,
+    approvalNumber: medicine.approvalNumber,
     quantity: medicine.quantity ?? 1,
     expireAt: formatApiDate(medicine.expiry),
     source: medicine.source,
@@ -156,6 +207,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   familyLoading: false,
   chatLoading: false,
   medicinesLoading: false,
+  recognitionLoading: false,
   historyLoading: false,
   setActiveTab: (tab) =>
     set({
@@ -275,6 +327,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       households: [],
       currentHousehold: undefined,
       householdMembers: [],
+      recognitionError: undefined,
       authChecked: true,
       identityError: undefined,
       authError: undefined,
@@ -294,6 +347,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({
         households,
         currentHousehold: households.find((item) => item.id === household.id) ?? household,
+        recognitionError: undefined,
         activeTab: "dashboard",
         currentScreen: "dashboard-home",
         ...emptyRuntimeState,
@@ -314,6 +368,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({
         households,
         currentHousehold: households.find((item) => item.id === household.id) ?? household,
+        recognitionError: undefined,
         activeTab: "dashboard",
         currentScreen: "dashboard-home",
         ...emptyRuntimeState,
@@ -334,6 +389,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       activeTab: "dashboard",
       currentScreen: "dashboard-home",
       householdMembers: [],
+      recognitionError: undefined,
       ...emptyRuntimeState,
     });
     void get().loadMedicines();
@@ -433,6 +489,36 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ medicinesLoading: false });
     }
   },
+  recognizeMedicineImages: async (files) => {
+    if (get().recognitionLoading) {
+      const recognizedMedicine = get().recognizedMedicine;
+      if (!recognizedMedicine) {
+        throw new Error("正在识别图片，请稍候");
+      }
+      return recognizedMedicine;
+    }
+
+    set({ recognitionLoading: true, recognitionError: undefined });
+    try {
+      const recognizedMedicine = await appApi.recognizeMedicineImages(files);
+      set({
+        recognizedMedicine,
+      });
+      return recognizedMedicine;
+    } catch (error) {
+      set({
+        recognizedMedicine: null,
+        recognitionError: error instanceof Error ? error.message : "图片识别失败",
+      });
+      throw error;
+    } finally {
+      set({ recognitionLoading: false });
+    }
+  },
+  clearRecognizedMedicine: () => set({
+    recognizedMedicine: null,
+    recognitionError: undefined,
+  }),
   loadHistory: async () => {
     if (get().historyLoading || !get().currentHousehold) return;
 
@@ -456,7 +542,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
   saveRecognizedMedicine: async (medicine) => {
-    const recognizedMedicine = medicine ?? {
+    const recognizedMedicine = medicine ?? get().recognizedMedicine ?? {
       ...demoMedicines[1],
       source: "图片识别",
       quantity: 1,
@@ -466,6 +552,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       ...toCabinetMedicineInput(recognizedMedicine),
       source: recognizedMedicine.source === "图片识别" ? "image" : "manual",
       notes: "App 用户自行维护录入",
+    });
+    set({
+      recognizedMedicine: null,
+      recognitionError: undefined,
     });
     await get().loadMedicines();
   },
@@ -501,7 +591,15 @@ export const useAppStore = create<AppState>((set, get) => ({
       text: input,
       timestamp: formatCurrentTime(),
     };
-    const nextMessages = [...get().chatMessages, nextMessage];
+    const placeholderId = `assistant-stream-${Date.now()}`;
+    const assistantPlaceholder: ChatMessage = {
+      id: placeholderId,
+      role: "assistant",
+      text: "",
+      statusText: "正在准备问诊",
+      timestamp: "刚刚",
+    };
+    const nextMessages = [...get().chatMessages, nextMessage, assistantPlaceholder];
 
     set({
       chatMessages: nextMessages,
@@ -513,40 +611,82 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
 
     try {
-      const response = await appApi.ask({
+      let resolvedSessionId = get().activeSessionId;
+      let resolvedMessageId = placeholderId;
+
+      await appApi.askStream({
         sessionId: get().activeSessionId,
         question: input,
         allowRxRecommendation: get().allowRxRecommendation,
+      }, (event: AskConsultationStreamEvent) => {
+        if (event.type === "session") {
+          resolvedSessionId = event.sessionId;
+          resolvedMessageId = event.messageId;
+          return;
+        }
+
+        if (event.type === "status") {
+          set({
+            activeSessionId: resolvedSessionId,
+            chatMessages: updateStreamingAssistant(get().chatMessages, placeholderId, (message) => ({
+              ...message,
+              statusText: event.message,
+            })),
+          });
+          return;
+        }
+
+        if (event.type === "answer_delta") {
+          set({
+            activeSessionId: resolvedSessionId,
+            chatMessages: updateStreamingAssistant(get().chatMessages, placeholderId, (message) => ({
+              ...message,
+              text: `${message.text}${event.delta}`,
+              statusText: "正在生成回复",
+            })),
+          });
+          return;
+        }
+
+        if (event.type === "complete") {
+          resolvedSessionId = event.sessionId;
+          resolvedMessageId = event.messageId;
+          set({
+            activeSessionId: event.sessionId,
+            chatMessages: updateStreamingAssistant(get().chatMessages, placeholderId, (message) => ({
+              ...message,
+              id: event.messageId,
+              text: event.answer,
+              disclaimer: event.disclaimer,
+              cards: toChatCardsFromRecommends(event.recommends),
+              statusText: undefined,
+              timestamp: formatCurrentTime(),
+            })),
+          });
+          return;
+        }
+
+        if (event.type === "error") {
+          throw new Error(event.message);
+        }
       });
-      const cards = response.recommends.map((recommend) => ({
-        medicineId: recommend.medicineId,
-        name: recommend.name,
-        otc: recommend.otc === "RX" ? "Rx" as const : "OTC" as const,
-        indication: recommend.indication,
-        summary: [
-          recommend.reason,
-          ...recommend.warnings.map((warning) => `风险提示：${warning}`),
-        ].join("；"),
-        warnings: recommend.warnings,
-      }));
-      const assistantMessage: ChatMessage = {
-        id: response.messageId,
-        role: "assistant",
-        text: response.answer,
-        disclaimer: response.disclaimer,
-        timestamp: formatCurrentTime(),
-        cards: cards.length > 0 ? cards : undefined,
-      };
 
       set({
-        activeSessionId: response.sessionId,
-        chatMessages: [...nextMessages, assistantMessage],
+        activeSessionId: resolvedSessionId,
+        chatMessages: updateStreamingAssistant(get().chatMessages, placeholderId, (message) => ({
+          ...message,
+          id: resolvedMessageId,
+          statusText: undefined,
+        })),
       });
       void get().loadHistory();
     } catch (error) {
       set({
         chatError: error instanceof Error ? error.message : "问诊服务暂不可用",
-        chatMessages: nextMessages,
+        chatMessages: updateStreamingAssistant(get().chatMessages, placeholderId, (message) => ({
+          ...message,
+          statusText: undefined,
+        })),
       });
     } finally {
       set({ chatLoading: false });

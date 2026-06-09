@@ -21,7 +21,7 @@ export function DashboardHome({
       description: "补充家中常备用药信息。",
       iconTone: "bg-sky-100 text-sky-700",
       icon: <EditIcon className="h-5 w-5" />,
-      action: () => onNavigate("entry-methods"),
+      action: () => onNavigate("manual-entry"),
     },
     {
       title: "药品查询",

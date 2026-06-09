@@ -3,7 +3,7 @@ import { randomUUID } from 'crypto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 import { AgentClientService } from '../agent-client/agent-client.service';
-import { AgentTraceStep, AgentUserProfile } from '../agent-client/agent-client.types';
+import { AgentTraceStep, AgentUserProfile, AgentRecommend } from '../agent-client/agent-client.types';
 import { CabinetService } from '../cabinet/cabinet.service';
 import { CurrentHousehold } from '@/domains/households/households.service';
 import { AskConsultationDto } from './dto/ask-consultation.dto';
@@ -53,6 +53,40 @@ type TraceRow = {
 };
 
 type CountRow = { count: bigint | number | string };
+
+type ConsultationStreamStage = 'prepare' | 'lookup' | 'agent' | 'fallback' | 'finalize';
+
+export type ConsultationStreamEvent =
+  | {
+      type: 'session';
+      sessionId: string;
+      messageId: string;
+    }
+  | {
+      type: 'status';
+      stage: ConsultationStreamStage;
+      message: string;
+    }
+  | {
+      type: 'answer_delta';
+      delta: string;
+    }
+  | {
+      type: 'complete';
+      sessionId: string;
+      messageId: string;
+      answer: string;
+      recommends: AgentRecommend[];
+      disclaimer: string;
+    };
+
+function normalizeStreamStage(stage?: string): ConsultationStreamStage {
+  if (stage === 'prepare' || stage === 'lookup' || stage === 'agent' || stage === 'fallback' || stage === 'finalize') {
+    return stage;
+  }
+
+  return 'agent';
+}
 
 @Injectable()
 export class ConsultationService {
@@ -109,6 +143,81 @@ export class ConsultationService {
       recommends: agentResponse.recommends,
       disclaimer: agentResponse.disclaimer,
     };
+  }
+
+  async askStream(
+    dto: AskConsultationDto,
+    current: CurrentHousehold,
+    onEvent: (event: ConsultationStreamEvent) => Promise<void> | void,
+  ) {
+    const question = dto.question.trim();
+    const sessionId = dto.sessionId?.trim() || randomUUID();
+    const assistantMessageId = randomUUID();
+    const title = this.buildSessionTitle(question);
+
+    if (dto.sessionId?.trim()) {
+      await this.assertSessionAccess(sessionId, current);
+    }
+
+    await this.ensureSession(sessionId, title, current);
+    await this.createMessage({
+      id: randomUUID(),
+      sessionId,
+      role: 'USER',
+      content: question,
+      recommends: null,
+    });
+    await onEvent({ type: 'session', sessionId, messageId: assistantMessageId });
+    await onEvent({ type: 'status', stage: 'lookup', message: '正在整理家庭药箱信息' });
+
+    const [medicines, userProfile] = await Promise.all([
+      this.cabinetService.findAgentBriefsByHousehold(current.householdId, question),
+      this.findAgentUserProfile(current.appUserId),
+    ]);
+
+    await onEvent({ type: 'status', stage: 'agent', message: '正在生成用药建议' });
+    const agentResponse = await this.agentClient.consultStream(
+      {
+        sessionId,
+        question,
+        medicines,
+        userProfile,
+        allowRxRecommendation: dto.allowRxRecommendation === true,
+      },
+      async (event) => {
+        if (event.type === 'status') {
+          await onEvent({
+            type: 'status',
+            stage: normalizeStreamStage(event.stage),
+            message: event.message,
+          });
+          return;
+        }
+
+        if (event.type === 'answer_delta') {
+          await onEvent({ type: 'answer_delta', delta: event.delta });
+        }
+      },
+    );
+
+    await onEvent({ type: 'status', stage: 'finalize', message: '正在保存问诊记录' });
+    await this.createMessage({
+      id: assistantMessageId,
+      sessionId,
+      role: 'ASSISTANT',
+      content: agentResponse.answer,
+      recommends: agentResponse.recommends,
+    });
+    await this.createTraces(sessionId, agentResponse.traces ?? []);
+
+    await onEvent({
+      type: 'complete',
+      sessionId,
+      messageId: assistantMessageId,
+      answer: agentResponse.answer,
+      recommends: agentResponse.recommends,
+      disclaimer: agentResponse.disclaimer,
+    });
   }
 
   async findSessions(query: QueryConsultationDto) {

@@ -76,7 +76,7 @@ export function ChatScreen({
           </div>
         </div>
       ) : null}
-      <div className="flex-1 pb-4">
+      <div className="flex-1 px-4 pb-4">
         {messages.length === 0 ? (
           <section className="rounded-[1.6rem] border border-emerald-100 bg-[linear-gradient(135deg,_#ecfdf5,_#f8fafc)] px-4 py-5 shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
             <p className="text-base font-semibold text-slate-950">输入症状或用药问题</p>
@@ -95,13 +95,13 @@ export function ChatScreen({
         />
         <div ref={bottomRef} className="h-px" />
       </div>
-      <div className="sticky bottom-0 z-20 mt-auto space-y-2 bg-[linear-gradient(180deg,_rgba(248,250,252,0),_rgba(248,250,252,0.96)_18%,_rgba(248,250,252,0.98))] pb-1 pt-3">
+      <div className="sticky bottom-0 z-20 mt-auto space-y-2 bg-[linear-gradient(180deg,_rgba(248,250,252,0),_rgba(248,250,252,0.96)_18%,_rgba(248,250,252,0.98))] pb-[env(safe-area-inset-bottom)] pt-3">
         {error && (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
             {error}
           </div>
         )}
-        <section className="rounded-[1.6rem] border border-slate-200 bg-[linear-gradient(180deg,_#ffffff,_#f8fafc)] p-3 shadow-[0_16px_34px_rgba(15,23,42,0.12)]">
+        <section className="border-t border-slate-200 bg-white p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)]">
           <div className="flex items-end gap-2">
             <textarea
               className="min-h-[44px] flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition-shadow focus:shadow-[0_0_0_3px_rgba(14,165,233,0.12)]"

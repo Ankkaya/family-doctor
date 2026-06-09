@@ -9,6 +9,9 @@ export type Medicine = {
   adverseReactions: string;
   otc: "OTC" | "Rx";
   barcode: string;
+  approvalNumber?: string;
+  dosage?: string;
+  manufacturer?: string;
   source: string;
   quantity?: number;
 };
@@ -26,6 +29,7 @@ export type ChatMessage = {
   id: string;
   role: "user" | "assistant";
   text: string;
+  statusText?: string;
   disclaimer?: string;
   cards?: ChatCard[];
   timestamp: string;

@@ -4,6 +4,7 @@ from fastapi import FastAPI
 
 from .api.consult import router as consult_router
 from .api.health import router as health_router
+from .api.medicine import router as medicine_router
 from .config import get_settings
 from .graph.builder import build_graph
 from .llm.provider import get_llm_provider
@@ -28,6 +29,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(health_router, prefix="/agent", tags=["health"])
     app.include_router(consult_router, prefix="/agent", tags=["consult"])
+    app.include_router(medicine_router, prefix="/agent", tags=["medicine"])
     return app
 
 

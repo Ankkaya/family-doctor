@@ -1,8 +1,8 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { CameraIcon, EditIcon, ScanIcon } from "@/features/shared-ui/icons";
 import { FormField, SectionCard, StepBanner } from "@/features/shared-ui/Surface";
-import { medicines, type Medicine } from "@/shared/mock/app-data";
+import type { Medicine } from "@/shared/mock/app-data";
 import { cn } from "@/shared/lib/utils";
 import type { ScreenKey } from "@/stores/useAppStore";
 
@@ -67,10 +67,10 @@ const inputClass = "min-h-11 w-full rounded-xl border border-slate-200 bg-slate-
 
 export function ManualEntry({
   onSave,
-  onScanBarcode,
+  onUploadImage,
 }: {
   onSave: (medicine: Medicine) => void;
-  onScanBarcode: () => void;
+  onUploadImage: () => void;
 }) {
   const [form, setForm] = useState<Medicine>({
     id: "manual-draft",
@@ -95,10 +95,26 @@ export function ManualEntry({
   return (
     <div className="space-y-4">
       <StepBanner
-        title="手动录入"
-        description="填写药品基础信息和说明信息。"
+        title="药品录入"
+        description="手动填写药品信息，也可以上传药盒图片识别。"
         step="01"
       />
+      <button
+        type="button"
+        className="flex w-full items-center justify-between rounded-[1.35rem] border border-emerald-100 bg-emerald-50 px-4 py-3 text-left active:bg-emerald-100"
+        onClick={onUploadImage}
+      >
+        <span className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500 text-white">
+            <CameraIcon className="h-5 w-5" />
+          </span>
+          <span>
+            <span className="block text-sm font-semibold text-slate-950">上传药盒图片识别</span>
+            <span className="mt-1 block text-xs text-emerald-700">识别后可在确认页补充和修改</span>
+          </span>
+        </span>
+        <span className="text-lg text-emerald-700">›</span>
+      </button>
       <SectionCard title="基础信息">
         <EditField label="药品名称" value={form.name} onChange={(value) => update("name", value)} />
         <EditField label="有效期" value={form.expiry} onChange={(value) => update("expiry", value)} />
@@ -114,7 +130,7 @@ export function ManualEntry({
           value={String(form.quantity ?? 1)}
           onChange={(value) => update("quantity", Math.max(1, Number(value) || 1))}
         />
-        <BarcodeField value={form.barcode} onChange={(value) => update("barcode", value)} onScan={onScanBarcode} />
+        <BarcodeField value={form.barcode} onChange={(value) => update("barcode", value)} />
       </SectionCard>
       <SectionCard title="说明信息">
         <EditField label="适应症" value={form.indication} onChange={(value) => update("indication", value)} multiline />
@@ -141,36 +157,73 @@ export function ManualEntry({
 function BarcodeField({
   value,
   onChange,
-  onScan,
 }: {
   value: string;
   onChange: (value: string) => void;
-  onScan: () => void;
 }) {
   return (
     <label className="block text-sm">
       <span className="mb-2 block text-slate-500">条形码</span>
-      <div className="relative">
-        <input
-          className={`${inputClass} pr-12`}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-        />
-        <button
-          type="button"
-          className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-sky-50 hover:text-sky-700"
-          title="扫描条形码"
-          aria-label="扫描条形码"
-          onClick={onScan}
-        >
-          <ScanIcon className="h-4 w-4" />
-        </button>
-      </div>
+      <input className={inputClass} value={value} onChange={(event) => onChange(event.target.value)} />
     </label>
   );
 }
 
-export function ImageUpload({ onConfirm }: { onConfirm: () => void }) {
+export function ImageUpload({
+  loading,
+  error,
+  onConfirm,
+}: {
+  loading: boolean;
+  error?: string;
+  onConfirm: (files: File[]) => Promise<void>;
+}) {
+  const albumInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const previewUrlsRef = useRef<Set<string>>(new Set());
+  const [selectedImages, setSelectedImages] = useState<Array<{ id: string; file: File; url: string }>>([]);
+  const [activePreviewUrl, setActivePreviewUrl] = useState("");
+  const [showPickerOptions, setShowPickerOptions] = useState(false);
+
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    if (files.length > 0) {
+      const nextImages = files.map((file) => {
+        const url = URL.createObjectURL(file);
+        previewUrlsRef.current.add(url);
+        return {
+          id: `${file.name}-${file.lastModified}-${crypto.randomUUID()}`,
+          file,
+          url,
+        };
+      });
+      setSelectedImages((current) => [...current, ...nextImages]);
+    }
+    event.target.value = "";
+  };
+
+  useEffect(() => {
+    const previewUrls = previewUrlsRef.current;
+    return () => {
+      previewUrls.forEach((url) => URL.revokeObjectURL(url));
+      previewUrls.clear();
+    };
+  }, []);
+
+  const removeImage = (id: string) => {
+    setSelectedImages((current) => {
+      const image = current.find((item) => item.id === id);
+      if (image) {
+        URL.revokeObjectURL(image.url);
+        previewUrlsRef.current.delete(image.url);
+        if (activePreviewUrl === image.url) {
+          setActivePreviewUrl("");
+        }
+      }
+      return current.filter((item) => item.id !== id);
+    });
+  };
+
   return (
     <div className="space-y-4">
       <StepBanner
@@ -178,23 +231,149 @@ export function ImageUpload({ onConfirm }: { onConfirm: () => void }) {
         description="拍摄药盒、说明书或瓶身图片。"
         step="02"
       />
-      <section className="rounded-[1.75rem] border border-dashed border-sky-300 bg-[radial-gradient(circle_at_top,_rgba(125,211,252,0.2),_transparent_50%),linear-gradient(180deg,_#eff6ff,_#f8fafc)] p-8 text-center">
-        <p className="text-sm font-medium text-sky-700">上传药品图片</p>
-        <p className="mt-3 text-sm leading-6 text-slate-600">
-          拍照或从相册选择图片后确认药品信息。
-        </p>
-      </section>
+      <input
+        ref={cameraInputRef}
+        className="hidden"
+        type="file"
+        accept="image/*"
+        capture="environment"
+        multiple
+        onChange={handleFileChange}
+      />
+      <input
+        ref={albumInputRef}
+        className="hidden"
+        type="file"
+        accept="image/*"
+        multiple
+        onChange={handleFileChange}
+      />
+      {selectedImages.length > 0 ? (
+        <div className="grid grid-cols-4 gap-2">
+          {selectedImages.map((image, index) => (
+            <div key={image.id} className="relative aspect-square overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+              <button
+                type="button"
+                className="h-full w-full"
+                onClick={() => setActivePreviewUrl(image.url)}
+              >
+                <img className="h-full w-full object-cover" src={image.url} alt={`药品照片 ${index + 1}`} />
+              </button>
+              <button
+                type="button"
+                aria-label="删除图片"
+                className="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-slate-950/70 text-sm leading-none text-white"
+                onClick={() => removeImage(image.id)}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : null}
       <div className="grid grid-cols-2 gap-3">
-        <Button variant="secondary" className="h-14 bg-white">拍照上传</Button>
-        <Button variant="secondary" className="h-14 bg-white">从相册选择</Button>
+        <Button
+          className="h-12 w-full"
+          disabled={loading}
+          onClick={() => setShowPickerOptions(true)}
+        >
+          {loading ? "识别中" : "添加照片"}
+        </Button>
+        <Button
+          className="h-12 w-full"
+          disabled={selectedImages.length === 0 || loading}
+          onClick={() => void onConfirm(selectedImages.map((image) => image.file))}
+        >
+          确定
+        </Button>
       </div>
-      <Button className="w-full" size="lg" onClick={onConfirm}>继续</Button>
+      {error ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
+          {error}
+        </div>
+      ) : null}
+      {showPickerOptions ? (
+        <div className="fixed inset-0 z-50 flex items-end bg-slate-950/40 px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
+          <section className="w-full rounded-[1.35rem] bg-white p-3 shadow-[0_20px_60px_rgba(15,23,42,0.24)]">
+            <button
+              type="button"
+              className="h-12 w-full rounded-2xl text-sm font-semibold text-slate-900 active:bg-slate-100"
+              onClick={() => {
+                setShowPickerOptions(false);
+                cameraInputRef.current?.click();
+              }}
+            >
+              拍照
+            </button>
+            <button
+              type="button"
+              className="mt-1 h-12 w-full rounded-2xl text-sm font-semibold text-slate-900 active:bg-slate-100"
+              onClick={() => {
+                setShowPickerOptions(false);
+                albumInputRef.current?.click();
+              }}
+            >
+              从相册选择
+            </button>
+            <button
+              type="button"
+              className="mt-2 h-12 w-full rounded-2xl bg-slate-100 text-sm font-semibold text-slate-600 active:bg-slate-200"
+              onClick={() => setShowPickerOptions(false)}
+            >
+              取消
+            </button>
+          </section>
+        </div>
+      ) : null}
+      {activePreviewUrl ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 p-4" onClick={() => setActivePreviewUrl("")}>
+          <button
+            type="button"
+            aria-label="关闭预览"
+            className="absolute right-4 top-[calc(env(safe-area-inset-top)+1rem)] grid h-10 w-10 place-items-center rounded-full bg-white/15 text-2xl text-white"
+            onClick={() => setActivePreviewUrl("")}
+          >
+            ×
+          </button>
+          <img className="max-h-full max-w-full object-contain" src={activePreviewUrl} alt="药品照片预览" />
+        </div>
+      ) : null}
     </div>
   );
 }
 
-export function RecognitionConfirm({ onSave }: { onSave: (medicine: Medicine) => void }) {
-  const medicine = medicines[1];
+export function RecognitionConfirm({
+  medicine,
+  error,
+  onRetry,
+  onSave,
+}: {
+  medicine: Medicine | null;
+  error?: string;
+  onRetry: () => void;
+  onSave: (medicine: Medicine) => void;
+}) {
+  const [draft, setDraft] = useState<Medicine | null>(medicine);
+
+  useEffect(() => {
+    setDraft(medicine);
+  }, [medicine]);
+
+  if (!draft) {
+    return (
+      <div className="space-y-4">
+        <StepBanner
+          title="识别结果确认"
+          description="确认药品基础信息和风险提示。"
+          step="03"
+        />
+        <section className="rounded-[1.5rem] border border-slate-200 bg-white px-4 py-5 text-sm leading-6 text-slate-600">
+          {error || "暂未识别到药品信息，请重新选择图片。"}
+        </section>
+        <Button className="w-full" onClick={onRetry}>重新识别</Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -203,20 +382,71 @@ export function RecognitionConfirm({ onSave }: { onSave: (medicine: Medicine) =>
         description="确认药品基础信息和风险提示。"
         step="03"
       />
+      {error ? (
+        <section className="rounded-[1.5rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
+          {error}
+        </section>
+      ) : null}
       <SectionCard title="结构化识别结果">
-        <FormField label="药品名称" value={medicine.name} />
-        <FormField label="有效期" value={medicine.expiry} />
-        <FormField label="适应症" value={medicine.indication} multiline />
-        <FormField label="禁忌人群" value={medicine.contraindications} multiline warning />
-        <FormField label="不良反应" value={medicine.adverseReactions} multiline />
-        <FormField label="条形码" value={medicine.barcode} />
+        <EditField label="药品名称" value={draft.name} onChange={(value) => setDraft({ ...draft, name: value })} />
+        <EditField label="有效期" value={draft.expiry} onChange={(value) => setDraft({ ...draft, expiry: value })} />
+        <label className="block text-sm">
+          <span className="mb-2 block text-slate-500">分类</span>
+          <select
+            className={inputClass}
+            value={draft.otc}
+            onChange={(event) => setDraft({ ...draft, otc: event.target.value as Medicine["otc"] })}
+          >
+            <option value="OTC">OTC(非处方药)</option>
+            <option value="Rx">RX(处方药)</option>
+          </select>
+        </label>
+        <EditField
+          label="适应症"
+          value={draft.indication}
+          onChange={(value) => setDraft({ ...draft, indication: value })}
+          multiline
+        />
+        <EditField
+          label="禁忌人群"
+          value={draft.contraindications}
+          onChange={(value) => setDraft({ ...draft, contraindications: value })}
+          multiline
+        />
+        <EditField
+          label="不良反应"
+          value={draft.adverseReactions}
+          onChange={(value) => setDraft({ ...draft, adverseReactions: value })}
+          multiline
+        />
+        <EditField
+          label="条形码"
+          value={draft.barcode}
+          onChange={(value) => setDraft({ ...draft, barcode: value })}
+        />
+        <EditField
+          label="批准文号"
+          value={draft.approvalNumber ?? ""}
+          onChange={(value) => setDraft({ ...draft, approvalNumber: value })}
+        />
+        <EditField
+          label="生产厂家"
+          value={draft.manufacturer ?? ""}
+          onChange={(value) => setDraft({ ...draft, manufacturer: value })}
+        />
+        <EditField
+          label="用法用量"
+          value={draft.dosage ?? ""}
+          onChange={(value) => setDraft({ ...draft, dosage: value })}
+          multiline
+        />
       </SectionCard>
       <section className="rounded-[1.5rem] border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
         确认后进入药品列表页。
       </section>
       <div className="grid grid-cols-2 gap-3">
-        <Button variant="secondary" className="bg-white">重新识别</Button>
-        <Button onClick={() => onSave({ ...medicine, source: "图片识别", quantity: 1 })}>确认保存</Button>
+        <Button variant="secondary" className="bg-white" onClick={onRetry}>重新识别</Button>
+        <Button onClick={() => onSave({ ...draft, source: "图片识别", quantity: draft.quantity ?? 1 })}>确认保存</Button>
       </div>
     </div>
   );

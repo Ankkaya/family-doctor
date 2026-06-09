@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type TouchEvent } from "react";
+import { onBackButtonPress } from "@tauri-apps/api/app";
+import { invoke } from "@tauri-apps/api/core";
 import { AppHeader } from "@/features/app-shell/AppHeader";
 import { BottomNav } from "@/features/app-shell/BottomNav";
 import { StatusBar } from "@/features/app-shell/StatusBar";
@@ -12,12 +14,13 @@ import { ProfileSettingsScreen } from "@/features/family/ProfileSettingsScreen";
 import { HistoryDetail, HistoryList } from "@/features/history/HistoryViews";
 import { EntryMethods, ImageUpload, ManualEntry, RecognitionConfirm, ScanEntry } from "@/features/intake/EntryMethods";
 import { MedicineDetail, MedicineList } from "@/features/medicine/MedicineViews";
-import { useAppStore, type ScreenKey } from "@/stores/useAppStore";
+import { showInfoToast } from "@/shared/toast/toast-store";
+import { useAppStore, type ScreenKey, type TabKey } from "@/stores/useAppStore";
 
 const screenTitleMap: Record<ScreenKey, string> = {
   "dashboard-home": "控制台",
   "entry-methods": "药品录入",
-  "manual-entry": "手动录入",
+  "manual-entry": "药品录入",
   "image-upload": "图片识别",
   "recognition-confirm": "确认药品信息",
   "scan-entry": "扫描条形码",
@@ -41,6 +44,7 @@ export function HomePage() {
   const chatInput = useAppStore((state) => state.chatInput);
   const chatMessages = useAppStore((state) => state.chatMessages);
   const medicines = useAppStore((state) => state.medicines);
+  const recognizedMedicine = useAppStore((state) => state.recognizedMedicine);
   const historySessions = useAppStore((state) => state.historySessions);
   const appUser = useAppStore((state) => state.appUser);
   const households = useAppStore((state) => state.households);
@@ -56,10 +60,11 @@ export function HomePage() {
   const chatLoading = useAppStore((state) => state.chatLoading);
   const chatError = useAppStore((state) => state.chatError);
   const medicinesLoading = useAppStore((state) => state.medicinesLoading);
+  const recognitionLoading = useAppStore((state) => state.recognitionLoading);
+  const recognitionError = useAppStore((state) => state.recognitionError);
   const historyLoading = useAppStore((state) => state.historyLoading);
   const setActiveTab = useAppStore((state) => state.setActiveTab);
   const navigate = useAppStore((state) => state.navigate);
-  const backToDashboard = useAppStore((state) => state.backToDashboard);
   const openMedicine = useAppStore((state) => state.openMedicine);
   const openHistory = useAppStore((state) => state.openHistory);
   const setSearchKeyword = useAppStore((state) => state.setSearchKeyword);
@@ -67,6 +72,8 @@ export function HomePage() {
   const loadMedicines = useAppStore((state) => state.loadMedicines);
   const loadHistory = useAppStore((state) => state.loadHistory);
   const loadMembers = useAppStore((state) => state.loadMembers);
+  const recognizeMedicineImages = useAppStore((state) => state.recognizeMedicineImages);
+  const clearRecognizedMedicine = useAppStore((state) => state.clearRecognizedMedicine);
   const initializeIdentity = useAppStore((state) => state.initializeIdentity);
   const login = useAppStore((state) => state.login);
   const register = useAppStore((state) => state.register);
@@ -84,6 +91,8 @@ export function HomePage() {
   const sendChat = useAppStore((state) => state.sendChat);
   const newChat = useAppStore((state) => state.newChat);
   const [showProfilePrompt, setShowProfilePrompt] = useState(false);
+  const exitPromptDeadlineRef = useRef(0);
+  const swipeStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
 
   useEffect(() => {
     void initializeIdentity();
@@ -104,14 +113,26 @@ export function HomePage() {
   );
   const missingProfileFields = getMissingProfileFields(appUser);
   const showBottomNav = currentScreen !== "chat";
-  const handleBack = () => {
-    if (activeTab === "chat") {
-      navigate("chat-history");
+  const isTabRoot = currentScreen === tabRootScreen(activeTab);
+  const requestExitOrPrompt = useCallback(() => {
+    const now = Date.now();
+    if (now < exitPromptDeadlineRef.current) {
+      void invoke("exit_app");
       return;
     }
 
-    backToDashboard();
-  };
+    exitPromptDeadlineRef.current = now + 1800;
+    showInfoToast("再次左划退出应用", 1600);
+  }, []);
+  const handleBack = useCallback(() => {
+    if (isTabRoot) {
+      requestExitOrPrompt();
+      return;
+    }
+
+    exitPromptDeadlineRef.current = 0;
+    navigate(previousScreen(currentScreen, activeTab));
+  }, [activeTab, currentScreen, isTabRoot, navigate, requestExitOrPrompt]);
   const handleSendChat = () => {
     if (missingProfileFields.length > 0) {
       setShowProfilePrompt(true);
@@ -128,6 +149,50 @@ export function HomePage() {
     setShowProfilePrompt(false);
     setActiveTab("profile");
     navigate("profile-settings");
+  };
+
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+
+    void onBackButtonPress(() => {
+      handleBack();
+    }).then((listener) => {
+      if (disposed) {
+        void listener.unregister();
+        return;
+      }
+
+      unlisten = () => void listener.unregister();
+    }).catch(() => undefined);
+
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [handleBack]);
+
+  const handleTouchStart = (event: TouchEvent<HTMLElement>) => {
+    const touch = event.touches[0];
+    swipeStartRef.current = {
+      x: touch.clientX,
+      y: touch.clientY,
+      time: Date.now(),
+    };
+  };
+
+  const handleTouchEnd = (event: TouchEvent<HTMLElement>) => {
+    const start = swipeStartRef.current;
+    swipeStartRef.current = null;
+    const touch = event.changedTouches[0];
+    if (!start || !touch) return;
+
+    const deltaX = start.x - touch.clientX;
+    const deltaY = start.y - touch.clientY;
+    const elapsed = Date.now() - start.time;
+    if (deltaX > 72 && Math.abs(deltaY) < 48 && elapsed < 650) {
+      handleBack();
+    }
   };
 
   if (!authChecked || identityLoading) {
@@ -160,8 +225,12 @@ export function HomePage() {
   }
 
   return (
-    <main className="h-[100dvh] overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(34,197,94,0.12),_transparent_24%),radial-gradient(circle_at_bottom,_rgba(14,165,233,0.16),_transparent_28%),linear-gradient(180deg,_#eef8f4_0%,_#f8fafc_34%,_#f8fafc_100%)] px-3 py-4 text-foreground">
-      <div className="mx-auto flex h-[calc(100dvh-2rem)] w-full max-w-md flex-col overflow-hidden rounded-[2.15rem] border border-white/70 bg-[linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(247,250,252,0.98))] shadow-[0_28px_100px_rgba(15,23,42,0.14)] ring-1 ring-slate-200/70">
+    <main
+      className="h-[100dvh] overflow-hidden bg-[linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(247,250,252,0.98))] text-foreground"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
+      <div className="mx-auto flex h-full w-full max-w-md flex-col overflow-hidden bg-[linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(247,250,252,0.98))]">
         <StatusBar />
         <AppHeader
           activeTab={activeTab}
@@ -170,22 +239,42 @@ export function HomePage() {
           onBack={handleBack}
           onNewChat={newChat}
         />
-        <div className="scrollbar-none flex-1 overflow-y-auto px-4 pb-6 pt-4">
+        <div
+          className={[
+            "scrollbar-none flex-1 overflow-y-auto pt-4",
+            currentScreen === "chat" ? "px-0 pb-0" : "px-4 pb-6",
+          ].join(" ")}
+        >
           {currentScreen === "dashboard-home" && (
             <DashboardHome medicines={medicines} onNavigate={navigate} onTabChange={setActiveTab} />
           )}
           {currentScreen === "entry-methods" && <EntryMethods onNavigate={navigate} />}
           {currentScreen === "manual-entry" && (
             <ManualEntry
-              onScanBarcode={() => navigate("scan-entry")}
+              onUploadImage={() => {
+                clearRecognizedMedicine();
+                navigate("image-upload");
+              }}
               onSave={(medicine) => {
                 void saveRecognizedMedicine(medicine).finally(() => navigate("medicine-list"));
               }}
             />
           )}
-          {currentScreen === "image-upload" && <ImageUpload onConfirm={() => navigate("recognition-confirm")} />}
+          {currentScreen === "image-upload" && (
+            <ImageUpload
+              loading={recognitionLoading}
+              error={recognitionError}
+              onConfirm={async (files) => {
+                await recognizeMedicineImages(files);
+                navigate("recognition-confirm");
+              }}
+            />
+          )}
           {currentScreen === "recognition-confirm" && (
             <RecognitionConfirm
+              medicine={recognizedMedicine ?? null}
+              error={recognitionError}
+              onRetry={() => navigate("image-upload")}
               onSave={(medicine) => {
                 void saveRecognizedMedicine(medicine).finally(() => navigate("medicine-list"));
               }}
@@ -293,6 +382,25 @@ function hasProfileText(value?: string | null) {
   return Boolean(value?.trim());
 }
 
+function tabRootScreen(tab: TabKey): ScreenKey {
+  if (tab === "chat") return "chat-history";
+  if (tab === "profile") return "profile";
+  return "dashboard-home";
+}
+
+function previousScreen(screen: ScreenKey, tab: TabKey): ScreenKey {
+  if (screen === "manual-entry") return tabRootScreen(tab);
+  if (screen === "image-upload" || screen === "scan-entry") return "manual-entry";
+
+  if (screen === "recognition-confirm") return "image-upload";
+  if (screen === "medicine-detail") return "medicine-list";
+  if (screen === "history-detail") return tab === "chat" ? "chat-history" : "history-list";
+  if (screen === "chat") return "chat-history";
+  if (screen === "profile-settings" || screen === "app-settings") return "profile";
+
+  return tabRootScreen(tab);
+}
+
 function ProfileCompletenessPrompt({
   missingFields,
   onComplete,
@@ -350,8 +458,8 @@ function ProfileCompletenessPrompt({
 
 function LoadingShell() {
   return (
-    <main className="h-[100dvh] overflow-hidden bg-[linear-gradient(180deg,_#eef8f4_0%,_#f8fafc_48%,_#ffffff_100%)] px-3 py-4 text-foreground">
-      <div className="mx-auto flex h-[calc(100dvh-2rem)] w-full max-w-md items-center justify-center overflow-hidden rounded-[2.15rem] border border-white/70 bg-white shadow-[0_28px_100px_rgba(15,23,42,0.14)] ring-1 ring-slate-200/70">
+    <main className="h-[100dvh] overflow-hidden bg-white text-foreground">
+      <div className="mx-auto flex h-full w-full max-w-md items-center justify-center overflow-hidden bg-white">
         <div className="text-center">
           <div className="mx-auto h-10 w-10 animate-pulse rounded-full bg-emerald-100" />
           <p className="mt-4 text-sm font-medium text-slate-500">加载中</p>

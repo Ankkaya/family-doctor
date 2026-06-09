@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Select } from "@/components/ui/select";
 import type { AppProfileInput, AppUser } from "@/shared/api/app-api";
 
 type GenderValue = "male" | "female" | "other" | "unknown";
@@ -153,17 +154,12 @@ export function ProfileSettingsScreen({
           </label>
           <label>
             <span className="text-xs font-semibold text-slate-500">性别</span>
-            <select
+            <Select
+              className="mt-1"
               value={gender}
-              onChange={(event) => setGender(event.target.value as GenderValue)}
-              className="mt-1 h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-950 outline-none focus:border-emerald-400"
-            >
-              {genderOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+              options={genderOptions}
+              onChange={setGender}
+            />
           </label>
         </div>
 
@@ -202,7 +198,7 @@ export function ProfileSettingsScreen({
         </button>
         <button
           type="submit"
-          className="h-12 rounded-2xl bg-slate-950 text-sm font-semibold text-white disabled:opacity-60"
+          className="h-12 rounded-2xl bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-60"
           disabled={loading}
         >
           {loading ? "保存中" : "保存"}

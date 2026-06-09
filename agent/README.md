@@ -13,6 +13,7 @@ app/
   api/
     consult.py       POST /agent/consult
     health.py        GET /agent/health
+    medicine.py      POST /agent/medicine/recognize-images
   graph/
     state.py         LangGraph State
     builder.py       构图: parse -> match -> risk -> render
@@ -25,7 +26,8 @@ app/
     provider.py      LLMProvider 抽象
     openai_provider.py OpenAI / DeepSeek 复用同一 OpenAI 兼容 SDK
 
-prompts/consult.v1.md   System Prompt 版本化
+prompts/consult.v1.md            问诊 Prompt
+prompts/medicine_recognize.v1.md 图片识别 Prompt
 tests/eval/             评测骨架
 ```
 
