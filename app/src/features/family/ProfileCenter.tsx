@@ -1,5 +1,8 @@
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import type { AppHousehold, AppHouseholdMember, AppUser } from "@/shared/api/app-api";
 import { EditIcon, SettingsIcon } from "@/features/shared-ui/icons";
+import { useTheme } from "@/shared/theme/theme-provider";
 
 export function ProfileCenter({
   user,
@@ -25,6 +28,7 @@ export function ProfileCenter({
 }) {
   const myRole = currentHousehold?.role ?? "member";
   const canEditMembers = myRole === "owner";
+  const { theme, setTheme } = useTheme();
 
   return (
     <div className="space-y-5">
@@ -41,24 +45,28 @@ export function ProfileCenter({
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <button
+            <Button
               type="button"
-              className="grid h-9 w-9 place-items-center rounded-full border border-white/20 bg-white/10 text-white/90"
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 rounded-full border border-white/20 bg-white/10 text-white/90 hover:bg-white/15"
               aria-label="系统设置"
               title="系统设置"
               onClick={onOpenSettings}
             >
               <SettingsIcon className="h-4 w-4" />
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="grid h-9 w-9 place-items-center rounded-full border border-white/20 bg-white/10 text-white/90"
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 rounded-full border border-white/20 bg-white/10 text-white/90 hover:bg-white/15"
               aria-label="编辑个人信息"
               title="编辑个人信息"
               onClick={onEditProfile}
             >
               <EditIcon className="h-4 w-4" />
-            </button>
+            </Button>
           </div>
         </div>
         <div className="mt-5 grid grid-cols-2 gap-2">
@@ -67,42 +75,61 @@ export function ProfileCenter({
         </div>
       </section>
 
-      <section className="rounded-[1.55rem] border border-slate-200 bg-white/90 p-4 shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
+      <section className="rounded-[1.55rem] border border-slate-200 bg-white/90 p-4 shadow-[0_10px_24px_rgba(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900/90">
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">主题模式</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+              {theme === "dark" ? "深色模式" : "浅色模式"}
+            </p>
+          </div>
+          <Switch
+            checked={theme === "dark"}
+            aria-label="切换深色模式"
+            onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
+          />
+        </div>
+      </section>
+
+      <section className="rounded-[1.55rem] border border-slate-200 bg-white/90 p-4 shadow-[0_10px_24px_rgba(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900/90">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-semibold text-slate-900">家庭</p>
-            <p className="mt-1 text-xs text-slate-500">{households.length} 个家庭</p>
+            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">家庭</p>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{households.length} 个家庭</p>
           </div>
         </div>
         <div className="mt-3 space-y-2">
           {households.map((household) => {
             const active = household.id === currentHousehold?.id;
             return (
-              <button
+              <Button
                 key={household.id}
                 type="button"
+                variant="outline"
                 className={[
-                  "flex w-full items-center justify-between rounded-2xl border px-3 py-3 text-left transition-colors",
-                  active ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-white",
+                  "flex h-auto w-full items-center justify-between whitespace-normal rounded-2xl px-3 py-3 text-left transition-colors",
+                  active
+                    ? "border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/40"
+                    : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950",
                 ].join(" ")}
                 onClick={() => void onSwitchHousehold(household.id)}
               >
                 <span>
-                  <span className="block text-sm font-semibold text-slate-950">{household.name}</span>
-                  <span className="mt-1 block text-xs text-slate-500">{household.code || "未生成邀请码"}</span>
+                  <span className="block text-sm font-semibold text-slate-950 dark:text-slate-100">{household.name}</span>
+                  <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">{household.code || "未生成邀请码"}</span>
                 </span>
-                <span className="text-xs font-semibold text-slate-500">{household.role === "owner" ? "管理员" : "成员"}</span>
-              </button>
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{household.role === "owner" ? "管理员" : "成员"}</span>
+              </Button>
             );
           })}
         </div>
       </section>
 
-      <section className="rounded-[1.55rem] border border-slate-200 bg-white/90 p-4 shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
+      <section className="rounded-[1.55rem] border border-slate-200 bg-white/90 p-4 shadow-[0_10px_24px_rgba(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900/90">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-semibold text-slate-900">成员</p>
-            <p className="mt-1 text-xs text-slate-500">{canEditMembers ? "管理员可编辑" : "仅查看"}</p>
+            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">成员</p>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{canEditMembers ? "管理员可编辑" : "仅查看"}</p>
           </div>
         </div>
         <div className="mt-3 space-y-2">
@@ -181,15 +208,17 @@ function MemberRow({
   const canPromoteToOwner = editable && member.role !== "owner";
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3">
+    <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3 dark:border-slate-800 dark:bg-slate-950">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-1.5">
-            <p className="truncate text-sm font-semibold text-slate-950">{displayName}</p>
+            <p className="truncate text-sm font-semibold text-slate-950 dark:text-slate-100">{displayName}</p>
             {editable ? (
-              <button
+              <Button
                 type="button"
-                className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 shrink-0 rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
                 aria-label="修改成员名称"
                 title="修改成员名称"
                 onClick={() => {
@@ -200,25 +229,26 @@ function MemberRow({
                 }}
               >
                 <EditIcon className="h-3.5 w-3.5" />
-              </button>
+              </Button>
             ) : null}
           </div>
         </div>
-        <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">
+        <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
           {member.role === "owner" ? "管理员" : "成员"}
         </span>
       </div>
       {canPromoteToOwner ? (
         <div className="mt-3">
-          <button
+          <Button
             type="button"
+            variant="secondary"
             className="h-9 w-full rounded-xl bg-emerald-50 text-xs font-semibold text-emerald-700"
             onClick={() => {
               void onUpdateMember(member.id, { role: "owner" });
             }}
           >
             设为管理员
-          </button>
+          </Button>
         </div>
       ) : null}
     </div>

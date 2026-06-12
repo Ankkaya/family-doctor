@@ -294,6 +294,36 @@ describe('AppAuthService', () => {
     }));
   });
 
+  it('normalizes negative profile markers to null', async () => {
+    const { service, prisma } = createService();
+    prisma.appUser.update.mockResolvedValueOnce({
+      id: 'app-user-1',
+      username: 'alice',
+      nickname: 'alice',
+      avatarUrl: null,
+      age: null,
+      gender: null,
+      allergies: null,
+      chronicDiseases: null,
+      medicationHistory: null,
+      defaultHouseholdId: null,
+    });
+
+    await service.updateProfile('app-user-1', {
+      allergies: '无过敏史',
+      chronicDiseases: '无',
+      medicationHistory: '暂无',
+    });
+
+    expect(prisma.appUser.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: {
+        allergies: null,
+        chronicDiseases: null,
+        medicationHistory: null,
+      },
+    }));
+  });
+
   it('uploads and stores the current app user avatar', async () => {
     const { service, prisma, minio } = createService();
     const file = {

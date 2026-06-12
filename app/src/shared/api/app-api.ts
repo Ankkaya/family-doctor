@@ -417,6 +417,12 @@ function toChatCards(value: unknown): ChatCard[] | undefined {
   return cards.length > 0 ? cards : undefined;
 }
 
+function getMedicineNotice(value: unknown) {
+  return Array.isArray(value) && value.length === 0
+    ? "未找到与当前描述明确匹配的家庭药箱药品，请结合症状变化及时补充描述或就医咨询。"
+    : undefined;
+}
+
 function toChatMessage(item: BackendConsultationMessage): ChatMessage {
   return {
     id: item.id,
@@ -424,6 +430,7 @@ function toChatMessage(item: BackendConsultationMessage): ChatMessage {
     text: item.content,
     timestamp: formatTime(item.createdAt),
     cards: toChatCards(item.recommends),
+    medicineNotice: item.role === "ASSISTANT" ? getMedicineNotice(item.recommends) : undefined,
   };
 }
 
@@ -431,6 +438,7 @@ function toHistorySession(item: BackendConsultationSession, messages: ChatMessag
   return {
     id: item.id,
     title: item.title || "未命名对话",
+    createdAt: item.createdAt,
     date: formatSessionDate(item.createdAt),
     time: formatTime(item.createdAt),
     summary: `${item.messageCount ?? messages.length} 条消息`,
@@ -446,7 +454,6 @@ export const appApi = {
   async login(input: { username: string; password: string }) {
     const auth = await httpClient.postJson<AppAuthResponse>("/app/auth/login", input, {
       skipAppAuth: true,
-      suppressErrorToast: true,
     });
     return persistSession(auth);
   },
@@ -454,7 +461,6 @@ export const appApi = {
   async register(input: { username: string; password: string; registrationCode: string }) {
     const auth = await httpClient.postJson<AppAuthResponse>("/app/auth/register", input, {
       skipAppAuth: true,
-      suppressErrorToast: true,
     });
     return persistSession(auth);
   },

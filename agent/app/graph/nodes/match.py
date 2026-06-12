@@ -1,10 +1,9 @@
-"""药品召回节点。通过 search_medicines tool 选择候选药。"""
+"""候选药品准备节点。保留家庭药箱候选，不做语义硬过滤。"""
 from __future__ import annotations
 
 from typing import Any
 
 from ...schemas import MedicineBrief, ParsedSymptoms
-from ...tools.medicine_search import search_medicines
 from ...tracing import trace_node
 
 
@@ -21,16 +20,20 @@ def make_match_node():
                 "allowRxRecommendation": allow_rx_recommendation,
             },
         ) as rec:
-            candidates = search_medicines(
-                medicines=medicines,
-                parsed=parsed,
-                allow_rx_recommendation=allow_rx_recommendation,
-                emergency=bool(state.get("emergency")),
-            )
+            candidates = [] if parsed.emergency or state.get("emergency") else medicines
             rec.set_output(
                 {
-                    "candidateIds": [m.id for m in candidates],
-                    "searchScores": {m.id: m.search_score for m in candidates},
+                    "candidateIds": [medicine.id for medicine in candidates],
+                    "candidateCount": len(candidates),
+                    "candidateMedicines": [
+                        {
+                            "medicineId": medicine.id,
+                            "name": medicine.name,
+                            "otc": medicine.otc,
+                            "indication": medicine.indication,
+                        }
+                        for medicine in candidates
+                    ],
                     "count": len(candidates),
                 }
             )

@@ -41,6 +41,18 @@ class Recommend(_CamelModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+class RiskReviewItem(_CamelModel):
+    medicine_id: str = Field(alias="medicineId")
+    suitable: bool
+    reason: str
+    reject_reason: str | None = Field(default=None, alias="rejectReason")
+    warnings: list[str] = Field(default_factory=list)
+
+
+class RiskReviewOutput(_CamelModel):
+    items: list[RiskReviewItem] = Field(default_factory=list)
+
+
 class TraceStep(_CamelModel):
     node_name: str = Field(alias="nodeName")
     input: dict[str, Any]

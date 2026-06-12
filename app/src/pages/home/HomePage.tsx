@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState, type TouchEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode, type TouchEvent } from "react";
 import { onBackButtonPress } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
+import { Button } from "@/components/ui/button";
 import { AppHeader } from "@/features/app-shell/AppHeader";
 import { BottomNav } from "@/features/app-shell/BottomNav";
 import { StatusBar } from "@/features/app-shell/StatusBar";
@@ -11,14 +12,15 @@ import { AppSettingsScreen } from "@/features/family/AppSettingsScreen";
 import { FamilySetupScreen } from "@/features/family/FamilySetupScreen";
 import { ProfileCenter } from "@/features/family/ProfileCenter";
 import { ProfileSettingsScreen } from "@/features/family/ProfileSettingsScreen";
-import { HistoryDetail, HistoryList } from "@/features/history/HistoryViews";
+import { HistoryDateBadge, HistoryDetail, HistoryList, HistoryTitleText } from "@/features/history/HistoryViews";
 import { EntryMethods, ImageUpload, ManualEntry, RecognitionConfirm, ScanEntry } from "@/features/intake/EntryMethods";
 import { MedicineDetail, MedicineList } from "@/features/medicine/MedicineViews";
 import { showInfoToast } from "@/shared/toast/toast-store";
+import { isTauri } from "@/shared/lib/platform";
 import { useAppStore, type ScreenKey, type TabKey } from "@/stores/useAppStore";
 
 const screenTitleMap: Record<ScreenKey, string> = {
-  "dashboard-home": "控制台",
+  "dashboard-home": "首页",
   "entry-methods": "药品录入",
   "manual-entry": "药品录入",
   "image-upload": "图片识别",
@@ -34,6 +36,7 @@ const screenTitleMap: Record<ScreenKey, string> = {
   "profile-settings": "个人信息",
   "app-settings": "系统设置",
 };
+const PROFILE_PROMPT_DISMISSED_KEY = "profile_prompt_dismissed";
 
 export function HomePage() {
   const activeTab = useAppStore((state) => state.activeTab);
@@ -54,14 +57,10 @@ export function HomePage() {
   const authChecked = useAppStore((state) => state.authChecked);
   const identityLoading = useAppStore((state) => state.identityLoading);
   const authLoading = useAppStore((state) => state.authLoading);
-  const authError = useAppStore((state) => state.authError);
   const familyLoading = useAppStore((state) => state.familyLoading);
-  const familyError = useAppStore((state) => state.familyError);
   const chatLoading = useAppStore((state) => state.chatLoading);
-  const chatError = useAppStore((state) => state.chatError);
   const medicinesLoading = useAppStore((state) => state.medicinesLoading);
   const recognitionLoading = useAppStore((state) => state.recognitionLoading);
-  const recognitionError = useAppStore((state) => state.recognitionError);
   const historyLoading = useAppStore((state) => state.historyLoading);
   const setActiveTab = useAppStore((state) => state.setActiveTab);
   const navigate = useAppStore((state) => state.navigate);
@@ -91,6 +90,7 @@ export function HomePage() {
   const sendChat = useAppStore((state) => state.sendChat);
   const newChat = useAppStore((state) => state.newChat);
   const [showProfilePrompt, setShowProfilePrompt] = useState(false);
+  const [skipProfilePromptNextTime, setSkipProfilePromptNextTime] = useState(false);
   const exitPromptDeadlineRef = useRef(0);
   const swipeStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
 
@@ -112,12 +112,12 @@ export function HomePage() {
     `${medicine.name}${medicine.indication}${medicine.otc}`.toLowerCase().includes(searchKeyword.toLowerCase()),
   );
   const missingProfileFields = getMissingProfileFields(appUser);
-  const showBottomNav = currentScreen !== "chat";
   const isTabRoot = currentScreen === tabRootScreen(activeTab);
+  const showBottomNav = isTabRoot;
   const requestExitOrPrompt = useCallback(() => {
     const now = Date.now();
     if (now < exitPromptDeadlineRef.current) {
-      void invoke("exit_app");
+      void exitApplication();
       return;
     }
 
@@ -134,7 +134,10 @@ export function HomePage() {
     navigate(previousScreen(currentScreen, activeTab));
   }, [activeTab, currentScreen, isTabRoot, navigate, requestExitOrPrompt]);
   const handleSendChat = () => {
-    if (missingProfileFields.length > 0) {
+    if (!appUser) return;
+
+    if (missingProfileFields.length > 0 && !isProfilePromptDismissed(appUser.id)) {
+      setSkipProfilePromptNextTime(false);
       setShowProfilePrompt(true);
       return;
     }
@@ -142,6 +145,9 @@ export function HomePage() {
     void sendChat();
   };
   const continueChatWithoutProfile = () => {
+    if (skipProfilePromptNextTime && appUser) {
+      dismissProfilePrompt(appUser.id);
+    }
     setShowProfilePrompt(false);
     void sendChat();
   };
@@ -149,6 +155,12 @@ export function HomePage() {
     setShowProfilePrompt(false);
     setActiveTab("profile");
     navigate("profile-settings");
+  };
+  const closeProfilePrompt = () => {
+    if (skipProfilePromptNextTime && appUser) {
+      dismissProfilePrompt(appUser.id);
+    }
+    setShowProfilePrompt(false);
   };
 
   useEffect(() => {
@@ -203,7 +215,6 @@ export function HomePage() {
     return (
       <AuthScreen
         loading={authLoading}
-        error={authError}
         onLogin={login}
         onRegister={register}
       />
@@ -215,7 +226,6 @@ export function HomePage() {
       <FamilySetupScreen
         households={households}
         loading={familyLoading}
-        error={familyError}
         onCreate={createHousehold}
         onJoin={joinHousehold}
         onSwitch={switchHousehold}
@@ -226,16 +236,16 @@ export function HomePage() {
 
   return (
     <main
-      className="h-[100dvh] overflow-hidden bg-[linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(247,250,252,0.98))] text-foreground"
+      className="h-[100dvh] overflow-hidden bg-[linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(247,250,252,0.98))] text-foreground dark:bg-[linear-gradient(180deg,_rgba(2,6,23,0.98),_rgba(15,23,42,0.98))]"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      <div className="mx-auto flex h-full w-full max-w-md flex-col overflow-hidden bg-[linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(247,250,252,0.98))]">
+      <div className="mx-auto flex h-full w-full max-w-md flex-col overflow-hidden bg-[linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(247,250,252,0.98))] dark:bg-[linear-gradient(180deg,_rgba(2,6,23,0.98),_rgba(15,23,42,0.98))]">
         <StatusBar />
         <AppHeader
           activeTab={activeTab}
           currentScreen={currentScreen}
-          title={screenTitleMap[currentScreen]}
+          title={getHeaderTitle(currentScreen, selectedHistory)}
           onBack={handleBack}
           onNewChat={newChat}
         />
@@ -256,27 +266,33 @@ export function HomePage() {
                 navigate("image-upload");
               }}
               onSave={(medicine) => {
-                void saveRecognizedMedicine(medicine).finally(() => navigate("medicine-list"));
+                void saveRecognizedMedicine(medicine)
+                  .then(() => navigate("medicine-list"))
+                  .catch(() => {
+                    // Interface errors are surfaced by the global toast.
+                  });
               }}
             />
           )}
           {currentScreen === "image-upload" && (
             <ImageUpload
               loading={recognitionLoading}
-              error={recognitionError}
               onConfirm={async (files) => {
-                await recognizeMedicineImages(files);
-                navigate("recognition-confirm");
+                return recognizeMedicineImages(files);
               }}
+              onViewResult={() => navigate("recognition-confirm")}
             />
           )}
           {currentScreen === "recognition-confirm" && (
             <RecognitionConfirm
               medicine={recognizedMedicine ?? null}
-              error={recognitionError}
               onRetry={() => navigate("image-upload")}
               onSave={(medicine) => {
-                void saveRecognizedMedicine(medicine).finally(() => navigate("medicine-list"));
+                void saveRecognizedMedicine(medicine)
+                  .then(() => navigate("medicine-list"))
+                  .catch(() => {
+                    // Interface errors are surfaced by the global toast.
+                  });
               }}
             />
           )}
@@ -309,7 +325,6 @@ export function HomePage() {
               medicines={medicines}
               user={appUser}
               isSending={chatLoading}
-              error={chatError}
               onInputChange={setChatInput}
               onSend={handleSendChat}
               onOpenMedicine={openMedicine}
@@ -331,7 +346,6 @@ export function HomePage() {
             <ProfileSettingsScreen
               user={appUser}
               loading={familyLoading}
-              error={familyError}
               onUploadAvatar={uploadAvatar}
               onSave={updateProfile}
               onCancel={() => navigate("profile")}
@@ -341,7 +355,6 @@ export function HomePage() {
             <AppSettingsScreen
               allowRxRecommendation={allowRxRecommendation}
               onToggleAllowRx={setAllowRxRecommendation}
-              onBack={() => navigate("profile")}
               onLogout={logout}
             />
           )}
@@ -351,13 +364,31 @@ export function HomePage() {
       {showProfilePrompt ? (
         <ProfileCompletenessPrompt
           missingFields={missingProfileFields}
+          skipNextTime={skipProfilePromptNextTime}
+          onSkipNextTimeChange={setSkipProfilePromptNextTime}
           onComplete={openProfileSettings}
           onContinue={continueChatWithoutProfile}
-          onClose={() => setShowProfilePrompt(false)}
+          onClose={closeProfilePrompt}
         />
       ) : null}
     </main>
   );
+}
+
+async function exitApplication() {
+  if (isTauri()) {
+    await invoke("exit_app").catch(() => {
+      showInfoToast("退出应用失败，请使用系统返回键或任务管理器关闭", 1800);
+    });
+    return;
+  }
+
+  window.close();
+  window.setTimeout(() => {
+    if (!window.closed) {
+      showInfoToast("浏览器预览模式无法直接关闭应用", 1800);
+    }
+  }, 120);
 }
 
 function getMissingProfileFields(user?: {
@@ -382,6 +413,18 @@ function hasProfileText(value?: string | null) {
   return Boolean(value?.trim());
 }
 
+function profilePromptDismissedKey(userId: string) {
+  return `${PROFILE_PROMPT_DISMISSED_KEY}:${userId}`;
+}
+
+function isProfilePromptDismissed(userId: string) {
+  return window.localStorage.getItem(profilePromptDismissedKey(userId)) === "true";
+}
+
+function dismissProfilePrompt(userId: string) {
+  window.localStorage.setItem(profilePromptDismissedKey(userId), "true");
+}
+
 function tabRootScreen(tab: TabKey): ScreenKey {
   if (tab === "chat") return "chat-history";
   if (tab === "profile") return "profile";
@@ -401,20 +444,39 @@ function previousScreen(screen: ScreenKey, tab: TabKey): ScreenKey {
   return tabRootScreen(tab);
 }
 
+function getHeaderTitle(screen: ScreenKey, selectedHistory: ReturnType<typeof useAppStore.getState>["historySessions"][number] | null): ReactNode {
+  if (screen === "history-detail" && selectedHistory) {
+    return (
+      <span className="flex min-w-0 max-w-full items-center justify-center gap-2">
+        <span className="min-w-0 max-w-[11rem] truncate">
+          <HistoryTitleText session={selectedHistory} />
+        </span>
+        <HistoryDateBadge session={selectedHistory} />
+      </span>
+    );
+  }
+
+  return screenTitleMap[screen];
+}
+
 function ProfileCompletenessPrompt({
   missingFields,
+  skipNextTime,
+  onSkipNextTimeChange,
   onComplete,
   onContinue,
   onClose,
 }: {
   missingFields: string[];
+  skipNextTime: boolean;
+  onSkipNextTimeChange: (checked: boolean) => void;
   onComplete: () => void;
   onContinue: () => void;
   onClose: () => void;
 }) {
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 px-4">
-      <section className="w-full max-w-sm rounded-[1.5rem] bg-white p-5 shadow-[0_24px_80px_rgba(15,23,42,0.26)]">
+      <section className="w-full max-w-sm rounded-[1.5rem] bg-white p-5 shadow-[0_24px_80px_rgba(15,23,42,0.26)] dark:bg-slate-900">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-base font-semibold text-slate-950">补充基础信息</p>
@@ -422,34 +484,46 @@ function ProfileCompletenessPrompt({
               完善年龄、性别、过敏史、基础病和长期用药，有助于提高寻药推荐准确性。
             </p>
           </div>
-          <button
+          <Button
             type="button"
             aria-label="关闭"
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-slate-400 active:bg-slate-100"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0 rounded-full text-slate-400 active:bg-slate-100"
             onClick={onClose}
           >
             ×
-          </button>
+          </Button>
         </div>
         <div className="mt-4 rounded-2xl bg-slate-50 px-3 py-3">
           <p className="text-xs font-semibold text-slate-500">待补充</p>
           <p className="mt-1 text-sm font-medium leading-6 text-slate-800">{missingFields.join("、")}</p>
         </div>
+        <label className="mt-4 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-medium text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200">
+          <input
+            type="checkbox"
+            className="h-4 w-4 shrink-0 rounded border-slate-300 accent-primary"
+            checked={skipNextTime}
+            onChange={(event) => onSkipNextTimeChange(event.target.checked)}
+          />
+          <span>下次不再提醒</span>
+        </label>
         <div className="mt-5 grid grid-cols-2 gap-3">
-          <button
+          <Button
             type="button"
-            className="h-11 rounded-2xl border border-slate-200 bg-white text-sm font-semibold text-slate-700"
+            variant="outline"
+            className="h-11 rounded-2xl border-slate-200 bg-white text-sm font-semibold text-slate-700"
             onClick={onContinue}
           >
             继续提问
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className="h-11 rounded-2xl bg-slate-950 text-sm font-semibold text-white"
+            className="h-11 rounded-2xl text-sm font-semibold"
             onClick={onComplete}
           >
             去补充
-          </button>
+          </Button>
         </div>
       </section>
     </div>

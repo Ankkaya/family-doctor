@@ -1,12 +1,13 @@
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+
 export function AppSettingsScreen({
   allowRxRecommendation,
   onToggleAllowRx,
-  onBack,
   onLogout,
 }: {
   allowRxRecommendation: boolean;
   onToggleAllowRx: (value: boolean) => Promise<void>;
-  onBack: () => void;
   onLogout: () => Promise<void>;
 }) {
   async function handleToggle(nextValue: boolean) {
@@ -22,57 +23,31 @@ export function AppSettingsScreen({
 
   return (
     <div className="space-y-5">
-      <section className="rounded-[1.55rem] border border-slate-200 bg-white/90 p-4 shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-base font-semibold text-slate-950">系统设置</p>
-            <p className="mt-1 text-xs leading-5 text-slate-500">控制寻药推荐范围和账号操作</p>
-          </div>
-          <button
-            type="button"
-            className="rounded-full bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600"
-            onClick={onBack}
-          >
-            返回
-          </button>
-        </div>
-      </section>
-
-      <section className="rounded-[1.55rem] border border-slate-200 bg-white/90 p-4 shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
+      <section className="rounded-[1.55rem] border border-slate-200 bg-white/90 p-4 shadow-[0_10px_24px_rgba(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900/90">
         <div className="flex items-center justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-slate-950">开启 RX 处方药推荐</p>
-            <p className="mt-1 text-xs leading-5 text-slate-500">
+            <p className="text-sm font-semibold text-slate-950 dark:text-slate-100">开启 RX 处方药推荐</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
               默认关闭。关闭时，寻药只推荐家庭药箱中的 OTC 非处方药。
             </p>
           </div>
-          <button
-            type="button"
+          <Switch
             role="switch"
-            aria-checked={allowRxRecommendation}
-            className={[
-              "relative h-8 w-14 shrink-0 rounded-full transition-colors",
-              allowRxRecommendation ? "bg-emerald-600" : "bg-slate-300",
-            ].join(" ")}
-            onClick={() => void handleToggle(!allowRxRecommendation)}
-          >
-            <span
-              className={[
-                "absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-transform",
-                allowRxRecommendation ? "translate-x-7" : "translate-x-1",
-              ].join(" ")}
-            />
-          </button>
+            checked={allowRxRecommendation}
+            aria-label="开启 RX 处方药推荐"
+            onCheckedChange={(checked) => void handleToggle(checked)}
+          />
         </div>
       </section>
 
-      <button
+      <Button
         type="button"
-        className="h-12 w-full rounded-2xl bg-slate-950 text-sm font-semibold text-white"
+        variant="destructive"
+        className="h-12 w-full rounded-2xl text-sm font-semibold"
         onClick={() => void onLogout()}
       >
         退出登录
-      </button>
+      </Button>
     </div>
   );
 }

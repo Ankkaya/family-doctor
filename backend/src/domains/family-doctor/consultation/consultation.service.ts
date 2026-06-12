@@ -8,6 +8,12 @@ import { CabinetService } from '../cabinet/cabinet.service';
 import { CurrentHousehold } from '@/domains/households/households.service';
 import { AskConsultationDto } from './dto/ask-consultation.dto';
 import { QueryConsultationDto } from './dto/query-consultation.dto';
+import {
+  getConsultationNodeSpec,
+  getConsultationPromptByNode,
+  getConsultationPromptCatalog,
+  type ConsultationNodeSpec,
+} from './consultation-debug';
 
 type SessionRow = {
   id: string;
@@ -52,9 +58,48 @@ type TraceRow = {
   createdAt: Date | string;
 };
 
+type PromptRuntimeInfo = {
+  key: string;
+  version: string;
+  sourceFile: string;
+  expectation: string | null;
+  systemPrompt: string | null;
+  userPrompt: string | null;
+};
+
+type TraceDetailRow = TraceRow & {
+  spec: ConsultationNodeSpec;
+  prompt: PromptRuntimeInfo | null;
+};
+
+type ConsultationTurn = {
+  turnIndex: number;
+  startedAt: string;
+  completedAt: string | null;
+  userMessage: MessageRow | null;
+  assistantMessage: MessageRow | null;
+  traces: TraceDetailRow[];
+};
+
 type CountRow = { count: bigint | number | string };
 
 type ConsultationStreamStage = 'prepare' | 'lookup' | 'agent' | 'fallback' | 'finalize';
+
+const EMPTY_PROFILE_VALUES = new Set([
+  '无',
+  '暂无',
+  '没有',
+  '无无',
+  '无过敏史',
+  '无基础病',
+  '无慢性病',
+  '无慢性病史',
+  '无长期用药',
+  'none',
+  'no',
+  'n/a',
+  'na',
+]);
 
 export type ConsultationStreamEvent =
   | {
@@ -116,7 +161,7 @@ export class ConsultationService {
     });
 
     const [medicines, userProfile] = await Promise.all([
-      this.cabinetService.findAgentBriefsByHousehold(current.householdId, question),
+      this.cabinetService.findAgentBriefsByHousehold(current.householdId),
       this.findAgentUserProfile(current.appUserId),
     ]);
     const agentResponse = await this.agentClient.consult({
@@ -171,7 +216,7 @@ export class ConsultationService {
     await onEvent({ type: 'status', stage: 'lookup', message: '正在整理家庭药箱信息' });
 
     const [medicines, userProfile] = await Promise.all([
-      this.cabinetService.findAgentBriefsByHousehold(current.householdId, question),
+      this.cabinetService.findAgentBriefsByHousehold(current.householdId),
       this.findAgentUserProfile(current.appUserId),
     ]);
 
@@ -234,6 +279,10 @@ export class ConsultationService {
 
   async findSession(id: string) {
     return this.findSessionInternal(id, { includeTraces: true });
+  }
+
+  async findPromptCatalog() {
+    return getConsultationPromptCatalog();
   }
 
   async removeAdmin(id: string) {
@@ -373,12 +422,16 @@ export class ConsultationService {
         : Promise.resolve([]),
     ]);
 
+    const traceDetails = traces.map((trace) => this.buildTraceDetail(trace));
+    const turns = this.buildConsultationTurns(messages, traceDetails);
     const result = {
       ...session,
       messages,
+      turns,
+      promptCatalog: getConsultationPromptCatalog(),
     };
 
-    return options.includeTraces ? { ...result, traces } : result;
+    return options.includeTraces ? { ...result, traces: traceDetails } : result;
   }
 
   private async assertSessionAccess(sessionId: string, current: CurrentHousehold) {
@@ -482,7 +535,14 @@ export class ConsultationService {
       },
     });
 
-    return user;
+    if (!user) return null;
+
+    return {
+      ...user,
+      allergies: this.normalizeOptionalProfileText(user.allergies),
+      chronicDiseases: this.normalizeOptionalProfileText(user.chronicDiseases),
+      medicationHistory: this.normalizeOptionalProfileText(user.medicationHistory),
+    };
   }
 
   private buildSessionWhere(input: { keyword?: string; householdId?: string; userId?: string }) {
@@ -513,5 +573,100 @@ export class ConsultationService {
   private buildSessionTitle(question: string) {
     const title = question.replace(/\s+/g, ' ').trim();
     return title.length > 24 ? `${title.slice(0, 24)}...` : title;
+  }
+
+  private normalizeOptionalProfileText(value?: string | null) {
+    const normalized = value?.trim();
+    if (!normalized) return null;
+
+    const compact = normalized.replace(/\s+/g, '').toLowerCase();
+    return EMPTY_PROFILE_VALUES.has(compact) ? null : normalized;
+  }
+
+  private buildTraceDetail(trace: TraceRow): TraceDetailRow {
+    const spec = getConsultationNodeSpec(trace.nodeName);
+    const promptMeta = getConsultationPromptByNode(trace.nodeName);
+    const traceInput = trace.input ?? {};
+    const traceOutput = trace.output ?? {};
+    const systemPrompt = this.pickTraceText(traceInput.systemPrompt) ?? this.pickTraceText(traceOutput.systemPrompt);
+    const userPrompt = this.pickTraceText(traceInput.userPrompt) ?? this.pickTraceText(traceOutput.userPrompt);
+    const promptKey = this.pickTraceText(traceInput.promptKey) ?? promptMeta?.key ?? null;
+    const promptVersion = this.pickTraceText(traceInput.promptVersion) ?? promptMeta?.version ?? null;
+
+    return {
+      ...trace,
+      spec,
+      prompt: promptKey
+        ? {
+            key: promptKey,
+            version: promptVersion ?? 'unknown',
+            sourceFile: promptMeta?.sourceFile ?? '',
+            expectation: spec.promptExpectation ?? null,
+            systemPrompt,
+            userPrompt,
+          }
+        : null,
+    };
+  }
+
+  private buildConsultationTurns(messages: MessageRow[], traces: TraceDetailRow[]): ConsultationTurn[] {
+    const sortedMessages = [...messages].sort((left, right) => this.toTimestamp(left.createdAt) - this.toTimestamp(right.createdAt));
+    const sortedTraces = [...traces].sort((left, right) => this.toTimestamp(left.createdAt) - this.toTimestamp(right.createdAt));
+    const assistantMessages = sortedMessages.filter((item) => item.role === 'ASSISTANT');
+    const consumedAssistantIds = new Set<string>();
+    const consumedTraceIds = new Set<string>();
+    const turns: ConsultationTurn[] = [];
+
+    sortedMessages
+      .filter((item) => item.role === 'USER')
+      .forEach((userMessage, index) => {
+        const userTime = this.toTimestamp(userMessage.createdAt);
+        const assistantMessage = assistantMessages.find((candidate) => {
+          if (consumedAssistantIds.has(candidate.id)) {
+            return false;
+          }
+          return this.toTimestamp(candidate.createdAt) >= userTime;
+        }) ?? null;
+
+        if (assistantMessage) {
+          consumedAssistantIds.add(assistantMessage.id);
+        }
+
+        const assistantTime = assistantMessage ? this.toTimestamp(assistantMessage.createdAt) : Number.POSITIVE_INFINITY;
+        const turnTraces = sortedTraces.filter((trace) => {
+          if (consumedTraceIds.has(trace.id)) {
+            return false;
+          }
+          const traceTime = this.toTimestamp(trace.createdAt);
+          const belongsToTurn = traceTime >= userTime && traceTime <= assistantTime;
+          if (belongsToTurn) {
+            consumedTraceIds.add(trace.id);
+          }
+          return belongsToTurn;
+        });
+
+        turns.push({
+          turnIndex: index + 1,
+          startedAt: this.toIsoString(userMessage.createdAt),
+          completedAt: assistantMessage ? this.toIsoString(assistantMessage.createdAt) : null,
+          userMessage,
+          assistantMessage,
+          traces: turnTraces,
+        });
+      });
+
+    return turns;
+  }
+
+  private pickTraceText(value: unknown) {
+    return typeof value === 'string' && value.trim() ? value : null;
+  }
+
+  private toTimestamp(value: Date | string) {
+    return new Date(value).getTime();
+  }
+
+  private toIsoString(value: Date | string) {
+    return new Date(value).toISOString();
   }
 }

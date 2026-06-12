@@ -1,0 +1,10 @@
+{"type": "status", "stage": "agent", "message": "正在启动问诊 Agent"}
+{"type": "status", "stage": "agent", "message": "正在整理问题描述"}
+{"type": "status", "stage": "agent", "message": "正在识别症状和持续时间"}
+{"type": "status", "stage": "agent", "message": "正在检查急症风险"}
+{"type": "status", "stage": "agent", "message": "正在检查特殊人群风险"}
+{"type": "status", "stage": "agent", "message": "正在匹配家庭药箱药品"}
+{"type": "status", "stage": "agent", "message": "正在排序候选药品"}
+{"type": "status", "stage": "agent", "message": "正在生成用药风险提示"}
+{"type": "status", "stage": "agent", "message": "正在进行安全审核"}
+{"type": "status", "stage": "agent", "message": "正在组织回复"}

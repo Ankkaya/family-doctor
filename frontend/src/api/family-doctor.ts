@@ -162,11 +162,58 @@ export interface AgentTrace {
   latencyMs: number;
   error: string | null;
   createdAt: string;
+  spec?: ConsultationNodeSpec;
+  prompt?: TracePromptRuntime | null;
+}
+
+export interface ConsultationNodeSpec {
+  nodeName: string;
+  title: string;
+  description: string;
+  capabilities: string[];
+  expectedInput: string[];
+  expectedOutput: string[];
+  promptKey?: string;
+  promptExpectation?: string;
+}
+
+export interface TracePromptRuntime {
+  key: string;
+  version: string;
+  sourceFile: string;
+  expectation: string | null;
+  systemPrompt: string | null;
+  userPrompt: string | null;
+}
+
+export interface ConsultationTurn {
+  turnIndex: number;
+  startedAt: string;
+  completedAt: string | null;
+  userMessage: ConsultationMessage | null;
+  assistantMessage: ConsultationMessage | null;
+  traces: AgentTrace[];
+}
+
+export interface ConsultationPromptCatalogItem {
+  key: string;
+  title: string;
+  nodeName: string;
+  version: string;
+  sourceFile: string;
+  mode: 'system' | 'system+user-template';
+  variables: string[];
+  inputContract: string[];
+  outputContract: string[];
+  summary: string;
+  content: string;
 }
 
 export interface ConsultationDetail extends ConsultationSession {
   messages: ConsultationMessage[];
   traces: AgentTrace[];
+  turns: ConsultationTurn[];
+  promptCatalog: ConsultationPromptCatalogItem[];
 }
 
 export const getAdminMedicines = (params?: { keyword?: string; page?: number; pageSize?: number }) => {
@@ -257,6 +304,10 @@ export const getAdminConsultations = (params?: {
 
 export const getAdminConsultation = (id: string) => {
   return api.get<ConsultationDetail>(`/admin/consultations/${id}`);
+};
+
+export const getAdminConsultationPromptCatalog = () => {
+  return api.get<ConsultationPromptCatalogItem[]>('/admin/consultations-debug/prompts');
 };
 
 export const deleteAdminConsultation = (id: string) => {

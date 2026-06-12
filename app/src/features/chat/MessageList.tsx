@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import type { ChatMessage } from "@/shared/mock/app-data";
 import type { Medicine } from "@/shared/mock/app-data";
 import { ChatIcon, PillIcon, UserIcon } from "@/features/shared-ui/icons";
@@ -35,12 +36,12 @@ export function MessageList({
         const bubble =
           isUser
             ? "bg-sky-600 text-white"
-            : "border border-slate-200 bg-white text-slate-800";
+            : "border border-slate-200 bg-white text-slate-800 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200";
 
         return (
           <div key={message.id} className="flex flex-col">
             {message.timestamp ? (
-              <div className="mb-2 self-center rounded-full bg-slate-100 px-3 py-1 text-[11px] font-medium text-slate-500">
+              <div className="mb-2 self-center rounded-full bg-slate-100 px-3 py-1 text-[11px] font-medium text-slate-500 dark:bg-slate-900 dark:text-slate-400">
                 {message.timestamp}
               </div>
             ) : null}
@@ -50,6 +51,11 @@ export function MessageList({
                 <div className={cn("max-w-full rounded-[1.45rem] px-4 py-3 shadow-[0_8px_20px_rgba(15,23,42,0.06)]", bubble)}>
                   <MessageText message={message} />
                 </div>
+                {!isUser && message.medicineNotice ? (
+                  <div className="mt-2 max-w-full rounded-[1.2rem] border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800 dark:border-amber-900/70 dark:bg-amber-950/40 dark:text-amber-300">
+                    {message.medicineNotice}
+                  </div>
+                ) : null}
                 {message.cards && (
                   <div className="mt-2 grid w-full gap-2">
                     {message.cards.map((card) => {
@@ -58,9 +64,10 @@ export function MessageList({
                       if (!medicineName) return null;
 
                       return (
-                        <button
+                        <Button
                           key={card.medicineId}
-                          className="rounded-[1.45rem] border border-slate-200 bg-[linear-gradient(180deg,_#ffffff,_#fbfdff)] p-4 text-left shadow-[0_10px_24px_rgba(15,23,42,0.05)]"
+                          variant="outline"
+                          className="block h-auto whitespace-normal rounded-[1.45rem] border-slate-200 bg-[linear-gradient(180deg,_#ffffff,_#fbfdff)] p-4 text-left shadow-[0_10px_24px_rgba(15,23,42,0.05)] dark:border-slate-800 dark:bg-[linear-gradient(180deg,_#0f172a,_#111827)]"
                           onClick={() => onOpenMedicine(card.medicineId)}
                         >
                           <div className="flex items-center justify-between gap-3">
@@ -68,18 +75,18 @@ export function MessageList({
                               <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
                                 <PillIcon className="h-5 w-5" />
                               </div>
-                              <p className="text-base font-semibold text-slate-950">{medicineName}</p>
+                              <p className="text-base font-semibold text-slate-950 dark:text-slate-100">{medicineName}</p>
                             </div>
                             <Tag tone={(medicine?.otc || card.otc) === "OTC" ? "neutral" : "danger"}>
                               {formatMedicineCategory(medicine?.otc || card.otc || "OTC")}
                             </Tag>
                           </div>
-                          <p className="mt-2 text-sm leading-6 text-slate-600">{card.summary}</p>
+                          <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">{card.summary}</p>
                           <div className="mt-3 flex items-center justify-between">
                             <span className="text-xs text-slate-400">{medicine?.indication || card.indication || "适应症摘要"}</span>
                             <span className="text-sm font-semibold text-sky-700">{medicine ? "进入药品页" : "查看建议"}</span>
                           </div>
-                        </button>
+                        </Button>
                       );
                     })}
                   </div>
@@ -101,7 +108,7 @@ function MessageText({ message }: { message: ChatMessage }) {
   return (
     <>
       {message.statusText ? (
-        <p className="mb-2 text-xs leading-5 text-slate-500">
+        <p className="mb-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
           {message.statusText}
         </p>
       ) : null}
@@ -153,7 +160,7 @@ function AssistantLoadingMessage() {
   return (
     <div className="flex w-full items-start justify-start gap-2">
       <MessageAvatar role="assistant" />
-      <div className="rounded-[1.45rem] border border-slate-200 bg-white px-4 py-3 text-slate-700 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
+      <div className="rounded-[1.45rem] border border-slate-200 bg-white px-4 py-3 text-slate-700 shadow-[0_8px_20px_rgba(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
         <div className="flex items-center gap-2 text-sm leading-6">
           <span>AI 正在回复</span>
           <span className="flex items-center gap-1" aria-hidden="true">

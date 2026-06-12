@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { ApiError } from "@/shared/api/api-error";
 import type { AppProfileInput, AppUser } from "@/shared/api/app-api";
 
 type GenderValue = "male" | "female" | "other" | "unknown";
@@ -14,14 +18,12 @@ const genderOptions: { label: string; value: GenderValue }[] = [
 export function ProfileSettingsScreen({
   user,
   loading,
-  error,
   onSave,
   onUploadAvatar,
   onCancel,
 }: {
   user: AppUser;
   loading: boolean;
-  error?: string;
   onSave: (input: AppProfileInput) => Promise<void>;
   onUploadAvatar: (file: File) => Promise<AppUser>;
   onCancel: () => void;
@@ -56,14 +58,18 @@ export function ProfileSettingsScreen({
     }
 
     setLocalError("");
-    await onSave({
-      avatarUrl,
-      age: parsedAge,
-      gender,
-      allergies,
-      chronicDiseases,
-      medicationHistory,
-    });
+    try {
+      await onSave({
+        avatarUrl,
+        age: parsedAge,
+        gender,
+        allergies,
+        chronicDiseases,
+        medicationHistory,
+      });
+    } catch {
+      // Interface errors are surfaced by the global toast.
+    }
   }
 
   function handleAvatarFile(file?: File) {
@@ -71,11 +77,6 @@ export function ProfileSettingsScreen({
 
     if (!file.type.startsWith("image/")) {
       setLocalError("请选择图片文件");
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      setLocalError("头像图片大小不能超过 5MB");
       return;
     }
 
@@ -98,7 +99,9 @@ export function ProfileSettingsScreen({
       URL.revokeObjectURL(editor.sourceUrl);
       setEditor(null);
     } catch (error) {
-      setLocalError(error instanceof Error ? error.message : "头像处理失败");
+      if (!(error instanceof ApiError)) {
+        setLocalError(error instanceof Error ? error.message : "头像处理失败");
+      }
     }
   }
 
@@ -111,18 +114,19 @@ export function ProfileSettingsScreen({
 
   return (
     <form className="space-y-4" onSubmit={(event) => void handleSubmit(event)}>
-      <section className="rounded-[1.55rem] border border-slate-200 bg-white/90 p-4 shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
+      <section className="rounded-[1.55rem] border border-slate-200 bg-white/90 p-4 shadow-[0_10px_24px_rgba(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900/90">
         <div className="flex items-center gap-4">
-          <button
+          <Button
             type="button"
-            className="relative rounded-full outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2"
+            variant="ghost"
+            className="relative h-auto rounded-full p-0 outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2"
             aria-label="选择头像"
             title="选择头像"
             onClick={() => inputRef.current?.click()}
             disabled={loading}
           >
             <AvatarPreview avatarUrl={avatarUrl} name={user.nickname || user.username || "我"} />
-          </button>
+          </Button>
           <input
             ref={inputRef}
             type="file"
@@ -134,26 +138,26 @@ export function ProfileSettingsScreen({
             }}
           />
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-slate-950">点击头像更换</p>
-            <p className="mt-1 text-xs leading-5 text-slate-500">支持选择图片后缩放、旋转并裁剪为方形头像</p>
+            <p className="text-sm font-semibold text-slate-950 dark:text-slate-100">点击头像更换</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">支持选择图片后缩放、旋转并裁剪为方形头像</p>
           </div>
         </div>
       </section>
 
-      <section className="space-y-3 rounded-[1.55rem] border border-slate-200 bg-white/90 p-4 shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
+      <section className="space-y-3 rounded-[1.55rem] border border-slate-200 bg-white/90 p-4 shadow-[0_10px_24px_rgba(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900/90">
         <div className="grid grid-cols-[1fr_1.4fr] gap-3">
           <label>
-            <span className="text-xs font-semibold text-slate-500">年龄</span>
-            <input
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">年龄</span>
+            <Input
               value={age}
               onChange={(event) => setAge(event.target.value)}
               inputMode="numeric"
               placeholder="未填"
-              className="mt-1 h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-950 outline-none focus:border-emerald-400"
+              className="mt-1 h-11 rounded-2xl border-slate-200 bg-white text-sm text-slate-950 focus-visible:ring-emerald-100 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
             />
           </label>
           <label>
-            <span className="text-xs font-semibold text-slate-500">性别</span>
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">性别</span>
             <Select
               className="mt-1"
               value={gender}
@@ -183,26 +187,27 @@ export function ProfileSettingsScreen({
         />
       </section>
 
-      {localError || error ? (
-        <p className="rounded-2xl bg-red-50 px-3 py-2 text-sm font-medium text-red-600">{localError || error}</p>
+      {localError ? (
+        <p className="rounded-2xl bg-red-50 px-3 py-2 text-sm font-medium text-red-600">{localError}</p>
       ) : null}
 
       <div className="grid grid-cols-2 gap-3">
-        <button
+        <Button
           type="button"
-          className="h-12 rounded-2xl border border-slate-200 bg-white text-sm font-semibold text-slate-700"
+          variant="outline"
+          className="h-12 rounded-2xl border-slate-200 bg-white text-sm font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
           onClick={onCancel}
           disabled={loading}
         >
           取消
-        </button>
-        <button
+        </Button>
+        <Button
           type="submit"
-          className="h-12 rounded-2xl bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-60"
+          className="h-12 rounded-2xl text-sm font-semibold disabled:opacity-60"
           disabled={loading}
         >
           {loading ? "保存中" : "保存"}
-        </button>
+        </Button>
       </div>
       {editor ? (
         <AvatarEditor
@@ -256,8 +261,8 @@ function AvatarEditor({
 }) {
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 px-4">
-      <div className="w-full max-w-sm rounded-[1.5rem] bg-white p-4 shadow-[0_24px_80px_rgba(15,23,42,0.26)]">
-        <div className="mx-auto h-64 w-64 overflow-hidden rounded-full bg-slate-100">
+      <div className="w-full max-w-sm rounded-[1.5rem] bg-white p-4 shadow-[0_24px_80px_rgba(15,23,42,0.26)] dark:bg-slate-900">
+        <div className="mx-auto h-64 w-64 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-950">
           <img
             src={state.sourceUrl}
             alt=""
@@ -268,50 +273,53 @@ function AvatarEditor({
           />
         </div>
         <label className="mt-4 block">
-          <span className="text-xs font-semibold text-slate-500">缩放</span>
-          <input
+          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">缩放</span>
+          <Input
             type="range"
             min="1"
             max="3"
             step="0.05"
             value={state.zoom}
-            className="mt-2 w-full accent-emerald-600"
+            className="mt-2 h-auto w-full border-0 p-0 accent-emerald-600"
             onChange={(event) => onChange({ ...state, zoom: Number(event.target.value) })}
           />
         </label>
         <div className="mt-3 grid grid-cols-2 gap-2">
-          <button
+          <Button
             type="button"
-            className="h-10 rounded-2xl bg-slate-100 text-sm font-semibold text-slate-700"
+            variant="secondary"
+            className="h-10 rounded-2xl bg-slate-100 text-sm font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300"
             onClick={() => onChange({ ...state, rotation: state.rotation - 90 })}
           >
             左转
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className="h-10 rounded-2xl bg-slate-100 text-sm font-semibold text-slate-700"
+            variant="secondary"
+            className="h-10 rounded-2xl bg-slate-100 text-sm font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300"
             onClick={() => onChange({ ...state, rotation: state.rotation + 90 })}
           >
             右转
-          </button>
+          </Button>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-3">
-          <button
+          <Button
             type="button"
-            className="h-11 rounded-2xl border border-slate-200 bg-white text-sm font-semibold text-slate-700"
+            variant="outline"
+            className="h-11 rounded-2xl border-slate-200 bg-white text-sm font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300"
             onClick={onCancel}
             disabled={loading}
           >
             取消
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className="h-11 rounded-2xl bg-slate-950 text-sm font-semibold text-white disabled:opacity-60"
+            className="h-11 rounded-2xl text-sm font-semibold disabled:opacity-60"
             onClick={onConfirm}
             disabled={loading}
           >
             {loading ? "上传中" : "使用头像"}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -375,13 +383,13 @@ function TextAreaField({
 }) {
   return (
     <label className="block">
-      <span className="text-xs font-semibold text-slate-500">{label}</span>
-      <textarea
+      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{label}</span>
+      <Textarea
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         rows={4}
-        className="mt-1 w-full resize-none rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-950 outline-none focus:border-emerald-400"
+        className="mt-1 resize-none rounded-2xl border-slate-200 bg-white px-3 py-3 text-sm text-slate-950 focus-visible:ring-emerald-100 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
       />
     </label>
   );

@@ -37,6 +37,22 @@ const APP_USER_PROFILE_SELECT = {
   defaultHouseholdId: true,
 } satisfies Prisma.AppUserSelect;
 
+const EMPTY_PROFILE_VALUES = new Set([
+  '无',
+  '暂无',
+  '没有',
+  '无无',
+  '无过敏史',
+  '无基础病',
+  '无慢性病',
+  '无慢性病史',
+  '无长期用药',
+  'none',
+  'no',
+  'n/a',
+  'na',
+]);
+
 @Injectable()
 export class AppAuthService {
   constructor(
@@ -203,12 +219,12 @@ export class AppAuthService {
     if ('avatarUrl' in dto) data.avatarUrl = this.normalizeOptionalText(dto.avatarUrl);
     if ('age' in dto) data.age = dto.age ?? null;
     if ('gender' in dto) data.gender = dto.gender ?? null;
-    if ('allergies' in dto) data.allergies = this.normalizeOptionalText(dto.allergies);
+    if ('allergies' in dto) data.allergies = this.normalizeOptionalProfileText(dto.allergies);
     if ('chronicDiseases' in dto) {
-      data.chronicDiseases = this.normalizeOptionalText(dto.chronicDiseases);
+      data.chronicDiseases = this.normalizeOptionalProfileText(dto.chronicDiseases);
     }
     if ('medicationHistory' in dto) {
-      data.medicationHistory = this.normalizeOptionalText(dto.medicationHistory);
+      data.medicationHistory = this.normalizeOptionalProfileText(dto.medicationHistory);
     }
 
     return this.prisma.appUser.update({
@@ -272,6 +288,14 @@ export class AppAuthService {
   private normalizeOptionalText(value?: string | null) {
     const normalized = value?.trim();
     return normalized ? normalized : null;
+  }
+
+  private normalizeOptionalProfileText(value?: string | null) {
+    const normalized = this.normalizeOptionalText(value);
+    if (!normalized) return null;
+
+    const compact = normalized.replace(/\s+/g, '').toLowerCase();
+    return EMPTY_PROFILE_VALUES.has(compact) ? null : normalized;
   }
 
   private async loadRegistrationPolicy(tx: {

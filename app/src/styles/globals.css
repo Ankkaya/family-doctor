@@ -7,6 +7,8 @@
   --foreground: 222 47% 11%;
   --card: 0 0% 100%;
   --card-foreground: 222 47% 11%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
   --primary: 170 74% 34%;
   --primary-foreground: 210 40% 98%;
   --secondary: 210 40% 96%;
@@ -15,10 +17,34 @@
   --muted-foreground: 215 16% 47%;
   --accent: 168 44% 94%;
   --accent-foreground: 222 47% 11%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 210 40% 98%;
   --border: 214 32% 91%;
   --input: 214 32% 91%;
   --ring: 170 74% 34%;
   --radius: 1rem;
+}
+
+.dark {
+  --background: 222 47% 7%;
+  --foreground: 210 40% 98%;
+  --card: 222 47% 11%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222 47% 11%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 170 74% 40%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 217 33% 17%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 217 33% 17%;
+  --muted-foreground: 215 20% 65%;
+  --accent: 172 45% 16%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 63% 31%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 217 33% 17%;
+  --input: 217 33% 17%;
+  --ring: 170 74% 40%;
 }
 
 * {
@@ -43,6 +69,12 @@ body {
   background-image:
     radial-gradient(circle at top, rgba(16, 185, 129, 0.08), transparent 22%),
     linear-gradient(180deg, #eef8f4 0%, #f8fafc 32%, #f8fafc 100%);
+}
+
+.dark body {
+  background-image:
+    radial-gradient(circle at top, rgba(20, 184, 166, 0.12), transparent 24%),
+    linear-gradient(180deg, #020617 0%, #0f172a 42%, #111827 100%);
 }
 
 #root {

@@ -4,24 +4,28 @@ from __future__ import annotations
 from typing import Any
 
 from ...llm.provider import LLMProvider
+from ...prompting import load_prompt
 from ...schemas import ParsedSymptoms
 from ...tracing import trace_node
 
-PARSE_SYSTEM = (
-    "你是症状结构化助手。根据用户描述，抽取以下字段：\n"
-    "- symptoms：症状列表\n"
-    "- severity：严重程度（mild/moderate/severe/unknown）\n"
-    "- duration：持续时间\n"
-    "- population_hints：人群提示\n"
-    "- emergency：是否为急症（自伤、呼吸困难、意识障碍、大出血、胸痛等）\n"
-    "不要编造信息。"
-)
+PARSE_PROMPT_KEY = "consult.parse.system"
+PARSE_PROMPT_VERSION = "v1"
+PARSE_SYSTEM = load_prompt("parse.system.v1.md")
 
 
 def make_parse_node(llm: LLMProvider):
     async def parse(state: dict[str, Any]) -> dict[str, Any]:
         question: str = state.get("normalized_question") or state["question"]
-        with trace_node("parse", {"question": question}) as rec:
+        with trace_node(
+            "parse",
+            {
+                "question": question,
+                "promptKey": PARSE_PROMPT_KEY,
+                "promptVersion": PARSE_PROMPT_VERSION,
+                "systemPrompt": PARSE_SYSTEM,
+                "userPrompt": question,
+            },
+        ) as rec:
             parsed = await llm.structured(
                 system=PARSE_SYSTEM,
                 user=question,

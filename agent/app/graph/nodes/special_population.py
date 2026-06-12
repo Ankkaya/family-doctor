@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 from ...schemas import ParsedSymptoms, UserProfile
+from ...tools.safety_tools import normalize_profile_text
 from ...tracing import trace_node
 
 
@@ -26,14 +27,17 @@ def make_special_population_node():
                     flags.add("child")
                 if profile.age is not None and profile.age >= 65:
                     flags.add("elderly")
-                if profile.chronic_diseases:
+                chronic_diseases = normalize_profile_text(profile.chronic_diseases)
+                medication_history = normalize_profile_text(profile.medication_history)
+                allergies = normalize_profile_text(profile.allergies)
+                if chronic_diseases:
                     flags.add("chronic_disease")
                 profile_text = " ".join(
                     item
                     for item in [
-                        profile.chronic_diseases,
-                        profile.medication_history,
-                        profile.allergies,
+                        chronic_diseases,
+                        medication_history,
+                        allergies,
                     ]
                     if item
                 )

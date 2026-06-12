@@ -31,6 +31,7 @@ export type ChatMessage = {
   text: string;
   statusText?: string;
   disclaimer?: string;
+  medicineNotice?: string;
   cards?: ChatCard[];
   timestamp: string;
 };
@@ -38,6 +39,7 @@ export type ChatMessage = {
 export type HistorySession = {
   id: string;
   title: string;
+  createdAt?: string;
   date: string;
   time: string;
   summary: string;

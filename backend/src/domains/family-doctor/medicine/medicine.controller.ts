@@ -19,7 +19,6 @@ type AppRequest = {
 @ApiTags('家庭医生/药品目录')
 @Controller()
 export class MedicineController {
-  private static readonly MAX_IMAGE_SIZE = 5 * 1024 * 1024;
   private static readonly ALLOWED_IMAGE_TYPES = new Set([
     'image/jpeg',
     'image/png',
@@ -99,10 +98,6 @@ export class MedicineController {
     files.forEach((file) => {
       if (!MedicineController.ALLOWED_IMAGE_TYPES.has(file.mimetype)) {
         throw new BadRequestException('药品图片仅支持 JPG、PNG、WEBP、GIF、AVIF 格式');
-      }
-
-      if (file.size > MedicineController.MAX_IMAGE_SIZE) {
-        throw new BadRequestException('单张药品图片大小不能超过 5MB');
       }
     });
   }

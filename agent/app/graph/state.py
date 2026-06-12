@@ -23,6 +23,7 @@ class GraphState(TypedDict, total=False):
     emergency_reasons: list[str]
     special_population_flags: list[str]
     candidates: list[MedicineBrief]
+    review_decisions: list[dict[str, object]]
     safety_warnings: list[str]
     risk_level: str
     risked: list[Recommend]

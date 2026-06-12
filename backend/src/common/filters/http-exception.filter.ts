@@ -1,5 +1,26 @@
 import { ExceptionFilter, Catch, ArgumentsHost, HttpException } from '@nestjs/common';
 
+function pickMessage(rawMessage: string | string[], fallback: string) {
+  if (!Array.isArray(rawMessage)) {
+    return localizeMessage(rawMessage || fallback);
+  }
+
+  const preferredMessage = rawMessage.find((item) => item.startsWith('请输入'));
+  return localizeMessage(preferredMessage || rawMessage[0] || fallback);
+}
+
+function localizeMessage(message: string) {
+  if (
+    message.includes('Unexpected token') ||
+    message.includes('Expected property name') ||
+    message.includes('JSON at position')
+  ) {
+    return '请求参数格式不正确';
+  }
+
+  return message;
+}
+
 @Catch(HttpException)
 export class HttpExceptionFilter implements ExceptionFilter {
   catch(exception: HttpException, host: ArgumentsHost) {
@@ -19,10 +40,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
       'message' in exceptionResponse
     ) {
       const rawMessage = (exceptionResponse as { message?: string | string[] }).message;
-      if (Array.isArray(rawMessage)) {
-        message = rawMessage[0] || message;
-      } else if (rawMessage) {
-        message = rawMessage;
+      if (rawMessage) {
+        message = pickMessage(rawMessage, message);
       }
     }
 

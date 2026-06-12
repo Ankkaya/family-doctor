@@ -19,6 +19,14 @@ export class AgentClientService {
     return Number(process.env.AGENT_TIMEOUT_MS || 30000);
   }
 
+  private getErrorMessage(error: unknown, timeoutMs: number) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      return `Agent 调用超时（${timeoutMs}ms）`;
+    }
+
+    return error instanceof Error ? error.message : String(error);
+  }
+
   async consult(input: AgentConsultInput): Promise<AgentConsultOutput> {
     const baseUrl = this.getBaseUrl();
     const timeoutMs = this.getTimeoutMs();
@@ -46,7 +54,7 @@ export class AgentClientService {
         throw error;
       }
 
-      const message = error instanceof Error ? error.message : String(error);
+      const message = this.getErrorMessage(error, timeoutMs);
       this.logger.error(`Agent 服务调用失败: ${message}`);
       throw new BadGatewayException(`Agent 服务不可用: ${message}`);
     } finally {
@@ -81,7 +89,7 @@ export class AgentClientService {
         throw error;
       }
 
-      const message = error instanceof Error ? error.message : String(error);
+      const message = this.getErrorMessage(error, timeoutMs);
       this.logger.error(`Agent 图片识别调用失败: ${message}`);
       throw new BadGatewayException(`图片识别服务不可用: ${message}`);
     } finally {

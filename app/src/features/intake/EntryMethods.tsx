@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
+import { CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { CameraIcon, EditIcon, ScanIcon } from "@/features/shared-ui/icons";
-import { FormField, SectionCard, StepBanner } from "@/features/shared-ui/Surface";
+import { SectionCard } from "@/features/shared-ui/Surface";
 import type { Medicine } from "@/shared/mock/app-data";
 import { cn } from "@/shared/lib/utils";
 import type { ScreenKey } from "@/stores/useAppStore";
@@ -40,9 +44,10 @@ export function EntryMethods({ onNavigate }: { onNavigate: (screen: ScreenKey) =
   return (
     <div className="space-y-3">
       {methods.map((method) => (
-        <button
+        <Button
           key={method.title}
-          className="w-full rounded-[1.55rem] border border-slate-200 bg-[linear-gradient(180deg,_#ffffff,_#fbfdff)] p-4 text-left shadow-[0_10px_24px_rgba(15,23,42,0.05)]"
+          variant="outline"
+          className="block h-auto w-full whitespace-normal rounded-[1.55rem] border-slate-200 bg-[linear-gradient(180deg,_#ffffff,_#fbfdff)] p-4 text-left shadow-[0_10px_24px_rgba(15,23,42,0.05)] dark:border-slate-800 dark:bg-[linear-gradient(180deg,_#0f172a,_#111827)]"
           onClick={() => onNavigate(method.screen)}
         >
           <div className="flex items-center justify-between gap-3">
@@ -51,19 +56,25 @@ export function EntryMethods({ onNavigate }: { onNavigate: (screen: ScreenKey) =
                 {method.icon}
               </div>
               <div>
-                <h3 className="text-base font-semibold tracking-tight text-slate-950">{method.title}</h3>
+                <h3 className="text-base font-semibold tracking-tight text-slate-950 dark:text-slate-100">{method.title}</h3>
               </div>
             </div>
             <span className="text-slate-400">›</span>
           </div>
-          <p className="mt-2 text-sm leading-6 text-slate-600">{method.description}</p>
-        </button>
+          <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">{method.description}</p>
+        </Button>
       ))}
     </div>
   );
 }
 
-const inputClass = "min-h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none transition-shadow focus:shadow-[0_0_0_3px_rgba(14,165,233,0.12)]";
+const inputClass = "min-h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 outline-none transition-shadow focus:shadow-[0_0_0_3px_rgba(14,165,233,0.12)] dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100";
+const medicineCategoryOptions: Array<{ label: string; value: Medicine["otc"] }> = [
+  { label: "OTC(非处方药)", value: "OTC" },
+  { label: "RX(处方药)", value: "Rx" },
+];
+type RecognitionPhase = "idle" | "uploading" | "recognizing" | "finalizing" | "completed" | "failed";
+type RecognitionResultSummary = Medicine & { confidence?: number };
 
 export function ManualEntry({
   onSave,
@@ -94,14 +105,10 @@ export function ManualEntry({
 
   return (
     <div className="space-y-4">
-      <StepBanner
-        title="药品录入"
-        description="手动填写药品信息，也可以上传药盒图片识别。"
-        step="01"
-      />
-      <button
+      <Button
         type="button"
-        className="flex w-full items-center justify-between rounded-[1.35rem] border border-emerald-100 bg-emerald-50 px-4 py-3 text-left active:bg-emerald-100"
+        variant="outline"
+        className="flex h-auto w-full items-center justify-between whitespace-normal rounded-[1.35rem] border-emerald-100 bg-emerald-50 px-4 py-3 text-left active:bg-emerald-100"
         onClick={onUploadImage}
       >
         <span className="flex items-center gap-3">
@@ -109,21 +116,23 @@ export function ManualEntry({
             <CameraIcon className="h-5 w-5" />
           </span>
           <span>
-            <span className="block text-sm font-semibold text-slate-950">上传药盒图片识别</span>
+            <span className="block text-sm font-semibold text-slate-950 dark:text-slate-100">上传药盒图片识别</span>
             <span className="mt-1 block text-xs text-emerald-700">识别后可在确认页补充和修改</span>
           </span>
         </span>
         <span className="text-lg text-emerald-700">›</span>
-      </button>
+      </Button>
       <SectionCard title="基础信息">
         <EditField label="药品名称" value={form.name} onChange={(value) => update("name", value)} />
         <EditField label="有效期" value={form.expiry} onChange={(value) => update("expiry", value)} />
         <label className="block text-sm">
-          <span className="mb-2 block text-slate-500">分类</span>
-          <select className={inputClass} value={form.otc} onChange={(event) => update("otc", event.target.value)}>
-            <option value="OTC">OTC(非处方药)</option>
-            <option value="Rx">RX(处方药)</option>
-          </select>
+          <span className="mb-2 block text-slate-500 dark:text-slate-400">分类</span>
+          <Select
+            className="mt-0"
+            value={form.otc}
+            options={medicineCategoryOptions}
+            onChange={(value) => update("otc", value)}
+          />
         </label>
         <EditField
           label="数量"
@@ -163,20 +172,20 @@ function BarcodeField({
 }) {
   return (
     <label className="block text-sm">
-      <span className="mb-2 block text-slate-500">条形码</span>
-      <input className={inputClass} value={value} onChange={(event) => onChange(event.target.value)} />
+      <span className="mb-2 block text-slate-500 dark:text-slate-400">条形码</span>
+      <Input className={inputClass} value={value} onChange={(event) => onChange(event.target.value)} />
     </label>
   );
 }
 
 export function ImageUpload({
   loading,
-  error,
   onConfirm,
+  onViewResult,
 }: {
   loading: boolean;
-  error?: string;
-  onConfirm: (files: File[]) => Promise<void>;
+  onConfirm: (files: File[]) => Promise<RecognitionResultSummary>;
+  onViewResult: () => void;
 }) {
   const albumInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -184,10 +193,18 @@ export function ImageUpload({
   const [selectedImages, setSelectedImages] = useState<Array<{ id: string; file: File; url: string }>>([]);
   const [activePreviewUrl, setActivePreviewUrl] = useState("");
   const [showPickerOptions, setShowPickerOptions] = useState(false);
+  const [recognitionPhase, setRecognitionPhase] = useState<RecognitionPhase>("idle");
+  const [resultSummary, setResultSummary] = useState<RecognitionResultSummary | null>(null);
+
+  const resetRecognitionState = () => {
+    setRecognitionPhase("idle");
+    setResultSummary(null);
+  };
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
     if (files.length > 0) {
+      resetRecognitionState();
       const nextImages = files.map((file) => {
         const url = URL.createObjectURL(file);
         previewUrlsRef.current.add(url);
@@ -222,15 +239,33 @@ export function ImageUpload({
       }
       return current.filter((item) => item.id !== id);
     });
+    resetRecognitionState();
+  };
+
+  const handleConfirm = async () => {
+    const files = selectedImages.map((image) => image.file);
+    if (files.length === 0 || loading) return;
+
+    setResultSummary(null);
+    setRecognitionPhase("uploading");
+    const recognizingTimer = window.setTimeout(() => setRecognitionPhase("recognizing"), 450);
+    const finalizingTimer = window.setTimeout(() => setRecognitionPhase("finalizing"), 1800);
+
+    try {
+      const result = await onConfirm(files);
+      window.clearTimeout(recognizingTimer);
+      window.clearTimeout(finalizingTimer);
+      setResultSummary(result);
+      setRecognitionPhase("completed");
+    } catch {
+      window.clearTimeout(recognizingTimer);
+      window.clearTimeout(finalizingTimer);
+      setRecognitionPhase("failed");
+    }
   };
 
   return (
     <div className="space-y-4">
-      <StepBanner
-        title="图片识别"
-        description="拍摄药盒、说明书或瓶身图片。"
-        step="02"
-      />
       <input
         ref={cameraInputRef}
         className="hidden"
@@ -251,22 +286,25 @@ export function ImageUpload({
       {selectedImages.length > 0 ? (
         <div className="grid grid-cols-4 gap-2">
           {selectedImages.map((image, index) => (
-            <div key={image.id} className="relative aspect-square overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
-              <button
+            <div key={image.id} className="relative aspect-square overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900">
+              <Button
                 type="button"
-                className="h-full w-full"
+                variant="ghost"
+                className="h-full w-full rounded-none p-0"
                 onClick={() => setActivePreviewUrl(image.url)}
               >
                 <img className="h-full w-full object-cover" src={image.url} alt={`药品照片 ${index + 1}`} />
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 aria-label="删除图片"
-                className="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-slate-950/70 text-sm leading-none text-white"
+                variant="destructive"
+                size="icon"
+                className="absolute right-1 top-1 h-6 w-6 rounded-full p-0 text-sm leading-none shadow-sm"
                 onClick={() => removeImage(image.id)}
               >
                 ×
-              </button>
+              </Button>
             </div>
           ))}
         </div>
@@ -282,59 +320,65 @@ export function ImageUpload({
         <Button
           className="h-12 w-full"
           disabled={selectedImages.length === 0 || loading}
-          onClick={() => void onConfirm(selectedImages.map((image) => image.file))}
+          onClick={() => void handleConfirm()}
         >
           确定
         </Button>
       </div>
-      {error ? (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
-          {error}
-        </div>
-      ) : null}
+      <RecognitionStatusPanel
+        phase={recognitionPhase}
+        imageCount={selectedImages.length}
+        result={resultSummary}
+        onViewResult={onViewResult}
+      />
       {showPickerOptions ? (
         <div className="fixed inset-0 z-50 flex items-end bg-slate-950/40 px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
-          <section className="w-full rounded-[1.35rem] bg-white p-3 shadow-[0_20px_60px_rgba(15,23,42,0.24)]">
-            <button
+          <section className="w-full rounded-[1.35rem] bg-white p-3 shadow-[0_20px_60px_rgba(15,23,42,0.24)] dark:bg-slate-900">
+            <Button
               type="button"
-              className="h-12 w-full rounded-2xl text-sm font-semibold text-slate-900 active:bg-slate-100"
+              variant="ghost"
+              className="h-12 w-full rounded-2xl text-sm font-semibold text-slate-900 active:bg-slate-100 dark:text-slate-100 dark:active:bg-slate-800"
               onClick={() => {
                 setShowPickerOptions(false);
                 cameraInputRef.current?.click();
               }}
             >
               拍照
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="mt-1 h-12 w-full rounded-2xl text-sm font-semibold text-slate-900 active:bg-slate-100"
+              variant="ghost"
+              className="mt-1 h-12 w-full rounded-2xl text-sm font-semibold text-slate-900 active:bg-slate-100 dark:text-slate-100 dark:active:bg-slate-800"
               onClick={() => {
                 setShowPickerOptions(false);
                 albumInputRef.current?.click();
               }}
             >
               从相册选择
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="mt-2 h-12 w-full rounded-2xl bg-slate-100 text-sm font-semibold text-slate-600 active:bg-slate-200"
+              variant="secondary"
+              className="mt-2 h-12 w-full rounded-2xl bg-slate-100 text-sm font-semibold text-slate-600 active:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:active:bg-slate-700"
               onClick={() => setShowPickerOptions(false)}
             >
               取消
-            </button>
+            </Button>
           </section>
         </div>
       ) : null}
       {activePreviewUrl ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 p-4" onClick={() => setActivePreviewUrl("")}>
-          <button
+          <Button
             type="button"
             aria-label="关闭预览"
-            className="absolute right-4 top-[calc(env(safe-area-inset-top)+1rem)] grid h-10 w-10 place-items-center rounded-full bg-white/15 text-2xl text-white"
+            variant="ghost"
+            size="icon"
+            className="absolute right-4 top-[calc(env(safe-area-inset-top)+1rem)] h-10 w-10 rounded-full bg-white/15 text-2xl text-white hover:bg-white/20"
             onClick={() => setActivePreviewUrl("")}
           >
             ×
-          </button>
+          </Button>
           <img className="max-h-full max-w-full object-contain" src={activePreviewUrl} alt="药品照片预览" />
         </div>
       ) : null}
@@ -342,14 +386,127 @@ export function ImageUpload({
   );
 }
 
+function RecognitionStatusPanel({
+  phase,
+  imageCount,
+  result,
+  onViewResult,
+}: {
+  phase: RecognitionPhase;
+  imageCount: number;
+  result: RecognitionResultSummary | null;
+  onViewResult: () => void;
+}) {
+  if (imageCount === 0 && phase === "idle") {
+    return null;
+  }
+
+  const isRunning = phase === "uploading" || phase === "recognizing" || phase === "finalizing";
+  const statusText = getRecognitionStatusText(phase, imageCount);
+
+  return (
+    <section className="rounded-[1.35rem] border border-slate-200 bg-white px-4 py-3 shadow-[0_10px_24px_rgba(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900">
+      <div className="flex items-center gap-3">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+          {phase === "completed" ? (
+            <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
+          ) : isRunning ? (
+            <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+          ) : (
+            <span className="text-sm font-bold">{imageCount}</span>
+          )}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-slate-950 dark:text-slate-100">{statusText.title}</p>
+          <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">{statusText.description}</p>
+        </div>
+      </div>
+
+      {result ? (
+        <div className="mt-3 rounded-2xl bg-slate-50 px-3 py-3 dark:bg-slate-950">
+          <div className="grid grid-cols-2 gap-3 text-xs">
+            <SummaryItem label="药品名称" value={result.name} />
+            <SummaryItem label="分类" value={result.otc} />
+            <SummaryItem label="有效期" value={result.expiry} />
+            <SummaryItem
+              label="置信度"
+              value={formatConfidence(result.confidence)}
+            />
+          </div>
+          <Button className="mt-3 h-10 w-full rounded-2xl" onClick={onViewResult}>
+            查看并确认
+          </Button>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function SummaryItem({ label, value }: { label: string; value?: string | number }) {
+  return (
+    <div>
+      <p className="font-medium text-slate-500 dark:text-slate-400">{label}</p>
+      <p className="mt-1 truncate font-semibold text-slate-900 dark:text-slate-100">{value || "未识别"}</p>
+    </div>
+  );
+}
+
+function formatConfidence(confidence?: number) {
+  if (confidence == null) {
+    return "未返回";
+  }
+
+  return `${Math.round(confidence <= 1 ? confidence * 100 : confidence)}%`;
+}
+
+function getRecognitionStatusText(phase: RecognitionPhase, imageCount: number) {
+  if (phase === "uploading") {
+    return {
+      title: "正在上传图片",
+      description: "已开始提交图片，请保持当前页面打开。",
+    };
+  }
+
+  if (phase === "recognizing") {
+    return {
+      title: "正在识别药品信息",
+      description: "正在读取药盒、说明书或瓶身中的关键信息。",
+    };
+  }
+
+  if (phase === "finalizing") {
+    return {
+      title: "正在整理识别结果",
+      description: "正在生成可确认和编辑的结构化信息。",
+    };
+  }
+
+  if (phase === "completed") {
+    return {
+      title: "识别完成",
+      description: "请查看识别摘要，确认后可继续编辑药品信息。",
+    };
+  }
+
+  if (phase === "failed") {
+    return {
+      title: "识别未完成",
+      description: "请根据顶部提示调整后重试，或重新选择图片。",
+    };
+  }
+
+  return {
+    title: `已选择 ${imageCount} 张图片`,
+    description: "点击确定后开始上传并识别药品信息。",
+  };
+}
+
 export function RecognitionConfirm({
   medicine,
-  error,
   onRetry,
   onSave,
 }: {
   medicine: Medicine | null;
-  error?: string;
   onRetry: () => void;
   onSave: (medicine: Medicine) => void;
 }) {
@@ -362,13 +519,8 @@ export function RecognitionConfirm({
   if (!draft) {
     return (
       <div className="space-y-4">
-        <StepBanner
-          title="识别结果确认"
-          description="确认药品基础信息和风险提示。"
-          step="03"
-        />
-        <section className="rounded-[1.5rem] border border-slate-200 bg-white px-4 py-5 text-sm leading-6 text-slate-600">
-          {error || "暂未识别到药品信息，请重新选择图片。"}
+        <section className="rounded-[1.5rem] border border-slate-200 bg-white px-4 py-5 text-sm leading-6 text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+          暂未识别到药品信息，请重新选择图片。
         </section>
         <Button className="w-full" onClick={onRetry}>重新识别</Button>
       </div>
@@ -377,29 +529,16 @@ export function RecognitionConfirm({
 
   return (
     <div className="space-y-4">
-      <StepBanner
-        title="识别结果确认"
-        description="确认药品基础信息和风险提示。"
-        step="03"
-      />
-      {error ? (
-        <section className="rounded-[1.5rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
-          {error}
-        </section>
-      ) : null}
       <SectionCard title="结构化识别结果">
         <EditField label="药品名称" value={draft.name} onChange={(value) => setDraft({ ...draft, name: value })} />
         <EditField label="有效期" value={draft.expiry} onChange={(value) => setDraft({ ...draft, expiry: value })} />
         <label className="block text-sm">
-          <span className="mb-2 block text-slate-500">分类</span>
-          <select
-            className={inputClass}
+          <span className="mb-2 block text-slate-500 dark:text-slate-400">分类</span>
+          <Select
             value={draft.otc}
-            onChange={(event) => setDraft({ ...draft, otc: event.target.value as Medicine["otc"] })}
-          >
-            <option value="OTC">OTC(非处方药)</option>
-            <option value="Rx">RX(处方药)</option>
-          </select>
+            options={medicineCategoryOptions}
+            onChange={(value) => setDraft({ ...draft, otc: value })}
+          />
         </label>
         <EditField
           label="适应症"
@@ -445,7 +584,7 @@ export function RecognitionConfirm({
         确认后进入药品列表页。
       </section>
       <div className="grid grid-cols-2 gap-3">
-        <Button variant="secondary" className="bg-white" onClick={onRetry}>重新识别</Button>
+        <Button variant="secondary" className="bg-white dark:bg-slate-800" onClick={onRetry}>重新识别</Button>
         <Button onClick={() => onSave({ ...draft, source: "图片识别", quantity: draft.quantity ?? 1 })}>确认保存</Button>
       </div>
     </div>
@@ -455,11 +594,6 @@ export function RecognitionConfirm({
 export function ScanEntry({ onConfirm }: { onConfirm: () => void }) {
   return (
     <div className="space-y-4">
-      <StepBanner
-        title="扫码录入"
-        description="将条形码置于扫描框内。"
-        step="02"
-      />
       <section className="rounded-[1.75rem] bg-[linear-gradient(180deg,_#020617,_#111827)] p-5 text-white shadow-[0_14px_34px_rgba(15,23,42,0.2)]">
         <div className="mx-auto flex aspect-square max-w-[15rem] items-center justify-center rounded-[1.5rem] border border-dashed border-slate-500 bg-[radial-gradient(circle,_rgba(14,165,233,0.12),_transparent_55%)]">
           <div className="relative h-40 w-40 overflow-hidden rounded-[1.2rem] border-2 border-sky-400 shadow-[0_0_0_1px_rgba(255,255,255,0.08)_inset]">
@@ -488,15 +622,15 @@ function EditField({
 }) {
   return (
     <label className="block text-sm">
-      <span className="mb-2 block text-slate-500">{label}</span>
+      <span className="mb-2 block text-slate-500 dark:text-slate-400">{label}</span>
       {multiline ? (
-        <textarea
+        <Textarea
           className={`${inputClass} min-h-24 resize-none py-3 leading-6`}
           value={value}
           onChange={(event) => onChange(event.target.value)}
         />
       ) : (
-        <input className={inputClass} value={value} onChange={(event) => onChange(event.target.value)} />
+        <Input className={inputClass} value={value} onChange={(event) => onChange(event.target.value)} />
       )}
     </label>
   );

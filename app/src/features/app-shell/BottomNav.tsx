@@ -5,7 +5,7 @@ import type { TabKey } from "@/stores/useAppStore";
 const items: TabBarItem<TabKey>[] = [
   {
     key: "dashboard",
-    label: "控制台",
+    label: "首页",
     sublabel: "录药 / 看药 / 历史",
     icon: <DashboardIcon />,
   },
@@ -30,5 +30,12 @@ export function BottomNav({
   activeTab: TabKey;
   onChange: (tab: TabKey) => void;
 }) {
-  return <TabBar items={items} value={activeTab} onChange={onChange} />;
+  return (
+    <TabBar
+      items={items}
+      value={activeTab}
+      className="dark:border-slate-800 dark:bg-slate-950/90"
+      onChange={onChange}
+    />
+  );
 }

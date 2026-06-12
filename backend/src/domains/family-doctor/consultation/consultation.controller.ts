@@ -111,6 +111,15 @@ export class ConsultationController {
     return this.consultationService.findSession(id);
   }
 
+  @Get('admin/consultations-debug/prompts')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions('family-doctor:consultation:view')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '后台查看问诊 Agent Prompt 目录' })
+  findPromptCatalog() {
+    return this.consultationService.findPromptCatalog();
+  }
+
   @Delete('admin/consultations/:id')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions('family-doctor:consultation:delete')

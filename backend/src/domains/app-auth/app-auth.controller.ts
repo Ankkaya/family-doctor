@@ -18,7 +18,6 @@ type AppRequest = {
 @ApiTags('App/认证')
 @Controller('app/auth')
 export class AppAuthController {
-  private static readonly MAX_AVATAR_SIZE = 5 * 1024 * 1024;
   private static readonly ALLOWED_AVATAR_TYPES = new Set([
     'image/jpeg',
     'image/png',
@@ -94,10 +93,6 @@ export class AppAuthController {
 
     if (!AppAuthController.ALLOWED_AVATAR_TYPES.has(file.mimetype)) {
       throw new BadRequestException('头像仅支持 JPG、PNG、WEBP、GIF、AVIF 格式');
-    }
-
-    if (file.size > AppAuthController.MAX_AVATAR_SIZE) {
-      throw new BadRequestException('头像图片大小不能超过 5MB');
     }
   }
 }

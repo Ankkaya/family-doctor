@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { appApi } from "@/shared/api/app-api";
+import { ApiError } from "@/shared/api/api-error";
 import type {
   AppHousehold,
   AppHouseholdMember,
@@ -10,6 +11,7 @@ import type {
   RecognizedMedicineResult,
 } from "@/shared/api/app-api";
 import { appStore } from "@/shared/storage/app-store";
+import { showErrorToast } from "@/shared/toast/toast-store";
 import {
   type ChatMessage,
   type HistorySession,
@@ -160,6 +162,12 @@ function toChatCardsFromRecommends(
   return cards.length > 0 ? cards : undefined;
 }
 
+function getMedicineNoticeFromRecommends(
+  recommends: Array<{ medicineId: string }>,
+) {
+  return recommends.length === 0 ? "未找到与当前描述明确匹配的家庭药箱药品，请结合症状变化及时补充描述或就医咨询。" : undefined;
+}
+
 function updateStreamingAssistant(
   messages: ChatMessage[],
   placeholderId: string,
@@ -237,10 +245,8 @@ export const useAppStore = create<AppState>((set, get) => ({
           session.id === historyId ? detail : session,
         ),
       });
-    } catch (error) {
-      set({
-        historyError: error instanceof Error ? error.message : "对话详情暂不可用",
-      });
+    } catch {
+      set({ historyError: undefined });
     }
   },
   setSearchKeyword: (keyword) => set({ searchKeyword: keyword }),
@@ -261,13 +267,13 @@ export const useAppStore = create<AppState>((set, get) => ({
         currentHousehold: session?.household,
         allowRxRecommendation: allowRxRecommendation === true,
       });
-    } catch (error) {
+    } catch {
       set({
         authChecked: true,
         appUser: undefined,
         households: [],
         currentHousehold: undefined,
-        identityError: error instanceof Error ? error.message : "身份初始化失败",
+        identityError: undefined,
       });
     } finally {
       set({ identityLoading: false });
@@ -289,8 +295,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         authChecked: true,
         ...emptyRuntimeState,
       });
-    } catch (error) {
-      set({ authError: error instanceof Error ? error.message : "登录失败" });
+    } catch {
+      set({ authError: undefined });
     } finally {
       set({ authLoading: false });
     }
@@ -312,8 +318,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         authChecked: true,
         ...emptyRuntimeState,
       });
-    } catch (error) {
-      set({ authError: error instanceof Error ? error.message : "注册失败" });
+    } catch {
+      set({ authError: undefined });
     } finally {
       set({ authLoading: false });
     }
@@ -352,8 +358,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         currentScreen: "dashboard-home",
         ...emptyRuntimeState,
       });
-    } catch (error) {
-      set({ familyError: error instanceof Error ? error.message : "创建家庭失败" });
+    } catch {
+      set({ familyError: undefined });
     } finally {
       set({ familyLoading: false });
     }
@@ -373,8 +379,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         currentScreen: "dashboard-home",
         ...emptyRuntimeState,
       });
-    } catch (error) {
-      set({ familyError: error instanceof Error ? error.message : "加入家庭失败" });
+    } catch {
+      set({ familyError: undefined });
     } finally {
       set({ familyLoading: false });
     }
@@ -434,7 +440,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         activeTab: "profile",
       });
     } catch (error) {
-      set({ familyError: error instanceof Error ? error.message : "个人信息保存失败" });
+      set({ familyError: undefined });
       throw error;
     } finally {
       set({ familyLoading: false });
@@ -455,7 +461,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ appUser });
       return appUser;
     } catch (error) {
-      set({ familyError: error instanceof Error ? error.message : "头像上传失败" });
+      set({ familyError: undefined });
       throw error;
     } finally {
       set({ familyLoading: false });
@@ -479,11 +485,11 @@ export const useAppStore = create<AppState>((set, get) => ({
         medicines: remoteMedicines,
         selectedMedicineId,
       });
-    } catch (error) {
+    } catch {
       set({
         medicines: [],
         selectedMedicineId: "",
-        chatError: error instanceof Error ? error.message : "家庭药箱暂不可用",
+        chatError: undefined,
       });
     } finally {
       set({ medicinesLoading: false });
@@ -508,7 +514,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (error) {
       set({
         recognizedMedicine: null,
-        recognitionError: error instanceof Error ? error.message : "图片识别失败",
+        recognitionError: undefined,
       });
       throw error;
     } finally {
@@ -531,11 +537,11 @@ export const useAppStore = create<AppState>((set, get) => ({
           ? get().selectedHistoryId
           : remoteHistory[0]?.id ?? "",
       });
-    } catch (error) {
+    } catch {
       set({
         historySessions: [],
         selectedHistoryId: "",
-        historyError: error instanceof Error ? error.message : "对话历史暂不可用",
+        historyError: undefined,
       });
     } finally {
       set({ historyLoading: false });
@@ -659,6 +665,7 @@ export const useAppStore = create<AppState>((set, get) => ({
               text: event.answer,
               disclaimer: event.disclaimer,
               cards: toChatCardsFromRecommends(event.recommends),
+              medicineNotice: getMedicineNoticeFromRecommends(event.recommends),
               statusText: undefined,
               timestamp: formatCurrentTime(),
             })),
@@ -681,8 +688,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       });
       void get().loadHistory();
     } catch (error) {
+      if (!(error instanceof ApiError)) {
+        showErrorToast(error instanceof Error ? error.message : "问诊服务暂不可用");
+      }
       set({
-        chatError: error instanceof Error ? error.message : "问诊服务暂不可用",
+        chatError: undefined,
         chatMessages: updateStreamingAssistant(get().chatMessages, placeholderId, (message) => ({
           ...message,
           statusText: undefined,

@@ -7,9 +7,8 @@ from .nodes.emergency import make_emergency_node
 from .nodes.match import make_match_node
 from .nodes.parse import make_parse_node
 from .nodes.preprocess import make_preprocess_node
-from .nodes.rank import make_rank_node
 from .nodes.render import make_render_node
-from .nodes.risk import make_risk_node
+from .nodes.review import make_review_node
 from .nodes.safety import make_safety_node
 from .nodes.special_population import make_special_population_node
 from .state import GraphState
@@ -23,8 +22,7 @@ def build_graph(*, llm: LLMProvider, disclaimer: str):
     sg.add_node("emergency", make_emergency_node())
     sg.add_node("special_population", make_special_population_node())
     sg.add_node("match", make_match_node())
-    sg.add_node("rank", make_rank_node())
-    sg.add_node("risk", make_risk_node())
+    sg.add_node("review", make_review_node(llm))
     sg.add_node("safety", make_safety_node())
     sg.add_node("render", make_render_node(llm, disclaimer=disclaimer))
 
@@ -33,9 +31,8 @@ def build_graph(*, llm: LLMProvider, disclaimer: str):
     sg.add_edge("parse", "emergency")
     sg.add_edge("emergency", "special_population")
     sg.add_edge("special_population", "match")
-    sg.add_edge("match", "rank")
-    sg.add_edge("rank", "risk")
-    sg.add_edge("risk", "safety")
+    sg.add_edge("match", "review")
+    sg.add_edge("review", "safety")
     sg.add_edge("safety", "render")
     sg.add_edge("render", END)
 
