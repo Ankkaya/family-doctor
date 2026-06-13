@@ -93,6 +93,18 @@ const router = createRouter({
           meta: { title: '问诊日志', permission: 'family-doctor:consultation:view' }
         },
         {
+          path: 'consultations/prompts',
+          name: 'family-doctor-consultation-prompts',
+          component: () => import('@/views/family-doctor/consultation-prompts/index.vue'),
+          meta: { title: 'Prompt 管理', permission: 'family-doctor:consultation:view' }
+        },
+        {
+          path: 'consultations/:id',
+          name: 'family-doctor-consultation-detail',
+          component: () => import('@/views/family-doctor/consultation-detail/index.vue'),
+          meta: { title: '问诊详情', permission: 'family-doctor:consultation:view' }
+        },
+        {
           path: 'app-users',
           name: 'family-doctor-app-users',
           component: () => import('@/views/family-doctor/app-users/index.vue'),
