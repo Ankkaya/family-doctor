@@ -4,6 +4,7 @@ import { ApiError } from "@/shared/api/api-error";
 import type {
   AppHousehold,
   AppHouseholdMember,
+  AppCronJob,
   AppProfileInput,
   AppUser,
   AskConsultationStreamEvent,
@@ -35,6 +36,7 @@ export type ScreenKey =
   | "history-detail"
   | "chat"
   | "profile"
+  | "reminders"
   | "profile-settings"
   | "app-settings";
 
@@ -55,6 +57,7 @@ type AppState = {
   medicines: Medicine[];
   recognizedMedicine?: RecognizedMedicineResult | null;
   historySessions: HistorySession[];
+  reminderJobs: AppCronJob[];
   activeSessionId?: string;
   appUser?: AppUser;
   households: AppHousehold[];
@@ -75,6 +78,8 @@ type AppState = {
   recognitionError?: string;
   historyLoading: boolean;
   historyError?: string;
+  remindersLoading: boolean;
+  remindersError?: string;
   setActiveTab: (tab: TabKey) => void;
   navigate: (screen: ScreenKey) => void;
   backToDashboard: () => void;
@@ -98,6 +103,9 @@ type AppState = {
   recognizeMedicineImages: (files: File[]) => Promise<RecognizedMedicineResult>;
   clearRecognizedMedicine: () => void;
   loadHistory: () => Promise<void>;
+  loadReminders: () => Promise<void>;
+  updateReminderStatus: (jobId: string, status: "enabled" | "disabled") => Promise<void>;
+  deleteReminder: (jobId: string) => Promise<void>;
   saveRecognizedMedicine: (medicine?: Medicine) => Promise<void>;
   updateMedicine: (medicineId: string, medicine: Medicine) => Promise<void>;
   deleteMedicine: (medicineId: string) => Promise<void>;
@@ -114,6 +122,7 @@ const emptyRuntimeState = {
   medicines: [] as Medicine[],
   recognizedMedicine: null as RecognizedMedicineResult | null,
   historySessions: [] as HistorySession[],
+  reminderJobs: [] as AppCronJob[],
   activeSessionId: undefined,
 };
 
@@ -217,6 +226,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   medicinesLoading: false,
   recognitionLoading: false,
   historyLoading: false,
+  remindersLoading: false,
   setActiveTab: (tab) =>
     set({
       activeTab: tab,
@@ -236,6 +246,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       currentScreen: "history-detail",
       activeTab: get().activeTab === "chat" ? "chat" : "dashboard",
       historyError: undefined,
+      remindersError: undefined,
     });
 
     try {
@@ -401,6 +412,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     void get().loadMedicines();
     void get().loadHistory();
     void get().loadMembers();
+    void get().loadReminders();
   },
   loadMembers: async () => {
     const householdId = get().currentHousehold?.id;
@@ -547,6 +559,36 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ historyLoading: false });
     }
   },
+  loadReminders: async () => {
+    if (get().remindersLoading || !get().currentHousehold) return;
+
+    set({ remindersLoading: true, remindersError: undefined });
+    try {
+      const reminderJobs = await appApi.listCronJobs({ page: 1, pageSize: 100 });
+      set({ reminderJobs });
+    } catch {
+      set({
+        reminderJobs: [],
+        remindersError: undefined,
+      });
+    } finally {
+      set({ remindersLoading: false });
+    }
+  },
+  updateReminderStatus: async (jobId, status) => {
+    const updated = await appApi.updateCronJobStatus(jobId, status);
+    set({
+      reminderJobs: get().reminderJobs.map((job) => (job.id === jobId ? updated : job)),
+    });
+    await get().loadReminders();
+  },
+  deleteReminder: async (jobId) => {
+    await appApi.deleteCronJob(jobId);
+    set({
+      reminderJobs: get().reminderJobs.filter((job) => job.id !== jobId),
+    });
+    await get().loadReminders();
+  },
   saveRecognizedMedicine: async (medicine) => {
     const recognizedMedicine = medicine ?? get().recognizedMedicine ?? {
       ...demoMedicines[1],
@@ -687,6 +729,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         })),
       });
       void get().loadHistory();
+      void get().loadReminders();
     } catch (error) {
       if (!(error instanceof ApiError)) {
         showErrorToast(error instanceof Error ? error.message : "问诊服务暂不可用");

@@ -393,6 +393,53 @@ model AgentTrace {
   @@map("agent_trace")
 }
 
+model CronJob {
+  id               String             @id @default(cuid())
+  userId           String?            @map("user_id")
+  householdId      String             @map("household_id")
+  memberId         String?            @map("member_id")
+  type             String
+  taskType         String             @map("task_type")
+  title            String
+  status           String             @default("enabled")
+  cronExpression   String?            @map("cron_expression")
+  everySeconds     Int?               @map("every_seconds")
+  runAt            DateTime?          @map("run_at")
+  timezone         String             @default("Asia/Shanghai")
+  payload          Json               @default("{}")
+  source           String             @default("user_agent")
+  idempotencyKey   String?            @unique @map("idempotency_key")
+  nextRunAt        DateTime?          @map("next_run_at")
+  lastRunAt        DateTime?          @map("last_run_at")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+  deletedAt        DateTime?          @map("deleted_at")
+  executions       CronJobExecution[]
+
+  @@index([householdId, status])
+  @@index([userId])
+  @@index([taskType])
+  @@index([nextRunAt])
+  @@index([deletedAt])
+  @@map("cron_job")
+}
+
+model CronJobExecution {
+  id           String    @id @default(cuid())
+  jobId        String    @map("job_id")
+  status       String
+  startedAt    DateTime  @default(now()) @map("started_at")
+  finishedAt   DateTime? @map("finished_at")
+  result       Json?
+  errorMessage String?   @map("error_message")
+  dedupeKey    String?   @unique @map("dedupe_key")
+  job          CronJob   @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, startedAt])
+  @@index([status])
+  @@map("cron_job_execution")
+}
+
 // ==================== 枚举 ====================
 
 enum LogAction {

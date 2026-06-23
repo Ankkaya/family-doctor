@@ -5,7 +5,7 @@ import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 import { AgentClientService } from '../agent-client/agent-client.service';
 import { AgentTraceStep, AgentUserProfile, AgentRecommend } from '../agent-client/agent-client.types';
 import { CabinetService } from '../cabinet/cabinet.service';
-import { CurrentHousehold } from '@/domains/households/households.service';
+import { CurrentHousehold, HouseholdsService } from '@/domains/households/households.service';
 import { AskConsultationDto } from './dto/ask-consultation.dto';
 import { QueryConsultationDto } from './dto/query-consultation.dto';
 import {
@@ -139,6 +139,7 @@ export class ConsultationService {
     private readonly prisma: PrismaService,
     private readonly cabinetService: CabinetService,
     private readonly agentClient: AgentClientService,
+    private readonly householdsService: HouseholdsService,
   ) {}
 
   async ask(dto: AskConsultationDto, current: CurrentHousehold) {
@@ -160,16 +161,24 @@ export class ConsultationService {
       recommends: null,
     });
 
-    const [medicines, userProfile] = await Promise.all([
-      this.cabinetService.findAgentBriefsByHousehold(current.householdId),
+    const [medicines, userProfile, members, history] = await Promise.all([
+      this.cabinetService.findAgentBriefsByHousehold(current.householdId, question),
       this.findAgentUserProfile(current.appUserId),
+      this.findAgentMembers(current.householdId),
+      this.findRecentMessagesForAgent(sessionId),
     ]);
     const agentResponse = await this.agentClient.consult({
       sessionId,
       question,
+      userId: current.appUserId,
+      householdId: current.householdId,
       medicines,
+      members,
+      history,
       userProfile,
       allowRxRecommendation: dto.allowRxRecommendation === true,
+      timezone: 'Asia/Shanghai',
+      now: new Date().toISOString(),
     });
 
     await this.createMessage({
@@ -215,9 +224,11 @@ export class ConsultationService {
     await onEvent({ type: 'session', sessionId, messageId: assistantMessageId });
     await onEvent({ type: 'status', stage: 'lookup', message: '正在整理家庭药箱信息' });
 
-    const [medicines, userProfile] = await Promise.all([
-      this.cabinetService.findAgentBriefsByHousehold(current.householdId),
+    const [medicines, userProfile, members, history] = await Promise.all([
+      this.cabinetService.findAgentBriefsByHousehold(current.householdId, question),
       this.findAgentUserProfile(current.appUserId),
+      this.findAgentMembers(current.householdId),
+      this.findRecentMessagesForAgent(sessionId),
     ]);
 
     await onEvent({ type: 'status', stage: 'agent', message: '正在生成用药建议' });
@@ -225,9 +236,15 @@ export class ConsultationService {
       {
         sessionId,
         question,
+        userId: current.appUserId,
+        householdId: current.householdId,
         medicines,
+        members,
+        history,
         userProfile,
         allowRxRecommendation: dto.allowRxRecommendation === true,
+        timezone: 'Asia/Shanghai',
+        now: new Date().toISOString(),
       },
       async (event) => {
         if (event.type === 'status') {
@@ -543,6 +560,37 @@ export class ConsultationService {
       chronicDiseases: this.normalizeOptionalProfileText(user.chronicDiseases),
       medicationHistory: this.normalizeOptionalProfileText(user.medicationHistory),
     };
+  }
+
+  private async findAgentMembers(householdId: string) {
+    const members = await this.householdsService.listMembers(householdId);
+    return members.map((member) => ({
+      id: member.id,
+      displayName: member.displayName || member.user.nickname || member.user.username || '家庭成员',
+      userId: member.user.id,
+      role: member.role,
+    }));
+  }
+
+  private async findRecentMessagesForAgent(sessionId: string) {
+    const rows = await this.prisma.$queryRaw<MessageRow[]>(Prisma.sql`
+      SELECT
+        id,
+        session_id as "sessionId",
+        role::text as role,
+        content,
+        recommends,
+        created_at as "createdAt"
+      FROM consultation_message
+      WHERE session_id = ${sessionId}
+      ORDER BY created_at DESC
+      LIMIT 8
+    `);
+
+    return rows.reverse().map((message) => ({
+      role: message.role,
+      content: message.content,
+    }));
   }
 
   private buildSessionWhere(input: { keyword?: string; householdId?: string; userId?: string }) {

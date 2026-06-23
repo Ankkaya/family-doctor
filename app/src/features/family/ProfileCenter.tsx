@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import type { AppHousehold, AppHouseholdMember, AppUser } from "@/shared/api/app-api";
+import type { AppCronJob, AppHousehold, AppHouseholdMember, AppUser } from "@/shared/api/app-api";
 import { EditIcon, SettingsIcon } from "@/features/shared-ui/icons";
 import { useTheme } from "@/shared/theme/theme-provider";
 
@@ -9,15 +9,18 @@ export function ProfileCenter({
   currentHousehold,
   households,
   members,
+  reminderJobs,
   onSwitchHousehold,
   onUpdateMember,
   onEditProfile,
   onOpenSettings,
+  onOpenReminders,
 }: {
   user?: AppUser;
   currentHousehold?: AppHousehold;
   households: AppHousehold[];
   members: AppHouseholdMember[];
+  reminderJobs: AppCronJob[];
   onSwitchHousehold: (householdId: string) => Promise<void>;
   onUpdateMember: (
     memberId: string,
@@ -25,6 +28,7 @@ export function ProfileCenter({
   ) => Promise<void>;
   onEditProfile: () => void;
   onOpenSettings: () => void;
+  onOpenReminders: () => void;
 }) {
   const myRole = currentHousehold?.role ?? "member";
   const canEditMembers = myRole === "owner";
@@ -88,6 +92,36 @@ export function ProfileCenter({
             aria-label="切换深色模式"
             onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
           />
+        </div>
+      </section>
+
+      <section className="rounded-[1.55rem] border border-slate-200 bg-white/90 p-4 shadow-[0_10px_24px_rgba(15,23,42,0.05)] dark:border-slate-800 dark:bg-slate-900/90">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">定时任务</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+              {formatReminderSummary(reminderJobs)}
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-9 shrink-0 rounded-xl px-3 text-xs font-semibold"
+            onClick={onOpenReminders}
+          >
+            查看
+          </Button>
+        </div>
+        <div className="mt-3 space-y-2">
+          {reminderJobs.slice(0, 3).map((job) => (
+            <div
+              key={job.id}
+              className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-3 py-2 dark:bg-slate-950"
+            >
+              <span className="min-w-0 truncate text-sm font-medium text-slate-800 dark:text-slate-100">{job.title}</span>
+              <span className="shrink-0 text-xs text-slate-400">{job.nextRunAt || job.scheduleText}</span>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -189,6 +223,12 @@ function formatGender(gender?: string | null) {
     unknown: "未知",
   };
   return gender ? genderMap[gender] || gender : "性别未填";
+}
+
+function formatReminderSummary(jobs: AppCronJob[]) {
+  const enabled = jobs.filter((job) => job.status === "enabled").length;
+  const next = jobs.find((job) => job.nextRunAt)?.nextRunAt;
+  return next ? `${enabled} 个启用，下次 ${next}` : `${enabled} 个启用`;
 }
 
 function MemberRow({

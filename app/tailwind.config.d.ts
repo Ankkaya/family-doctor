@@ -32,6 +32,14 @@ declare const _default: {
                     DEFAULT: string;
                     foreground: string;
                 };
+                destructive: {
+                    DEFAULT: string;
+                    foreground: string;
+                };
+                popover: {
+                    DEFAULT: string;
+                    foreground: string;
+                };
                 card: {
                     DEFAULT: string;
                     foreground: string;
@@ -44,6 +52,8 @@ declare const _default: {
             };
         };
     };
-    plugins: any[];
+    plugins: {
+        handler: () => void;
+    }[];
 };
 export default _default;

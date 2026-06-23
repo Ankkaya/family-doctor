@@ -12,6 +12,7 @@ import { AppSettingsScreen } from "@/features/family/AppSettingsScreen";
 import { FamilySetupScreen } from "@/features/family/FamilySetupScreen";
 import { ProfileCenter } from "@/features/family/ProfileCenter";
 import { ProfileSettingsScreen } from "@/features/family/ProfileSettingsScreen";
+import { ReminderTasksScreen } from "@/features/family/ReminderTasksScreen";
 import { HistoryDateBadge, HistoryDetail, HistoryList, HistoryTitleText } from "@/features/history/HistoryViews";
 import { EntryMethods, ImageUpload, ManualEntry, RecognitionConfirm, ScanEntry } from "@/features/intake/EntryMethods";
 import { MedicineDetail, MedicineList } from "@/features/medicine/MedicineViews";
@@ -33,6 +34,7 @@ const screenTitleMap: Record<ScreenKey, string> = {
   "history-detail": "历史详情",
   chat: "新对话",
   profile: "个人中心",
+  reminders: "定时任务",
   "profile-settings": "个人信息",
   "app-settings": "系统设置",
 };
@@ -49,6 +51,7 @@ export function HomePage() {
   const medicines = useAppStore((state) => state.medicines);
   const recognizedMedicine = useAppStore((state) => state.recognizedMedicine);
   const historySessions = useAppStore((state) => state.historySessions);
+  const reminderJobs = useAppStore((state) => state.reminderJobs);
   const appUser = useAppStore((state) => state.appUser);
   const households = useAppStore((state) => state.households);
   const currentHousehold = useAppStore((state) => state.currentHousehold);
@@ -62,6 +65,7 @@ export function HomePage() {
   const medicinesLoading = useAppStore((state) => state.medicinesLoading);
   const recognitionLoading = useAppStore((state) => state.recognitionLoading);
   const historyLoading = useAppStore((state) => state.historyLoading);
+  const remindersLoading = useAppStore((state) => state.remindersLoading);
   const setActiveTab = useAppStore((state) => state.setActiveTab);
   const navigate = useAppStore((state) => state.navigate);
   const openMedicine = useAppStore((state) => state.openMedicine);
@@ -70,6 +74,7 @@ export function HomePage() {
   const setChatInput = useAppStore((state) => state.setChatInput);
   const loadMedicines = useAppStore((state) => state.loadMedicines);
   const loadHistory = useAppStore((state) => state.loadHistory);
+  const loadReminders = useAppStore((state) => state.loadReminders);
   const loadMembers = useAppStore((state) => state.loadMembers);
   const recognizeMedicineImages = useAppStore((state) => state.recognizeMedicineImages);
   const clearRecognizedMedicine = useAppStore((state) => state.clearRecognizedMedicine);
@@ -87,6 +92,8 @@ export function HomePage() {
   const saveRecognizedMedicine = useAppStore((state) => state.saveRecognizedMedicine);
   const updateMedicine = useAppStore((state) => state.updateMedicine);
   const deleteMedicine = useAppStore((state) => state.deleteMedicine);
+  const updateReminderStatus = useAppStore((state) => state.updateReminderStatus);
+  const deleteReminder = useAppStore((state) => state.deleteReminder);
   const sendChat = useAppStore((state) => state.sendChat);
   const newChat = useAppStore((state) => state.newChat);
   const [showProfilePrompt, setShowProfilePrompt] = useState(false);
@@ -104,7 +111,8 @@ export function HomePage() {
     void loadMedicines();
     void loadHistory();
     void loadMembers();
-  }, [currentHousehold, loadHistory, loadMembers, loadMedicines]);
+    void loadReminders();
+  }, [currentHousehold, loadHistory, loadMembers, loadMedicines, loadReminders]);
 
   const selectedMedicine = medicines.find((medicine) => medicine.id === selectedMedicineId) ?? medicines[0] ?? null;
   const selectedHistory = historySessions.find((session) => session.id === selectedHistoryId) ?? null;
@@ -336,10 +344,20 @@ export function HomePage() {
               currentHousehold={currentHousehold}
               households={households}
               members={householdMembers}
+              reminderJobs={reminderJobs}
               onSwitchHousehold={switchHousehold}
               onUpdateMember={updateMember}
               onEditProfile={() => navigate("profile-settings")}
               onOpenSettings={() => navigate("app-settings")}
+              onOpenReminders={() => navigate("reminders")}
+            />
+          )}
+          {currentScreen === "reminders" && (
+            <ReminderTasksScreen
+              jobs={reminderJobs}
+              loading={remindersLoading}
+              onToggleStatus={(jobId, enabled) => updateReminderStatus(jobId, enabled ? "enabled" : "disabled")}
+              onDelete={deleteReminder}
             />
           )}
           {currentScreen === "profile-settings" && (
@@ -439,7 +457,7 @@ function previousScreen(screen: ScreenKey, tab: TabKey): ScreenKey {
   if (screen === "medicine-detail") return "medicine-list";
   if (screen === "history-detail") return tab === "chat" ? "chat-history" : "history-list";
   if (screen === "chat") return "chat-history";
-  if (screen === "profile-settings" || screen === "app-settings") return "profile";
+  if (screen === "profile-settings" || screen === "app-settings" || screen === "reminders") return "profile";
 
   return tabRootScreen(tab);
 }

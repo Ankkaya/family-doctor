@@ -8,6 +8,17 @@ from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
 from ..schemas import ConsultRequest, ConsultResponse
+from ..tools.cron_job_tool import (
+    CronJobTool,
+    build_idempotency_key,
+    build_plan_from_text,
+    confirmation_text,
+    is_confirmation,
+    is_reminder_intent,
+    is_supported_reminder,
+    missing_fields_text,
+)
+from ..tracing import trace_node
 
 router = APIRouter()
 
@@ -25,6 +36,10 @@ NODE_STATUS_MESSAGES = {
 
 @router.post("/consult", response_model=ConsultResponse, response_model_by_alias=True)
 async def consult(payload: ConsultRequest, request: Request) -> ConsultResponse:
+    reminder_response = await _try_handle_reminder(payload, request)
+    if reminder_response:
+        return reminder_response
+
     graph = request.app.state.graph
     result = await graph.ainvoke(
         {
@@ -46,6 +61,27 @@ async def consult(payload: ConsultRequest, request: Request) -> ConsultResponse:
 
 @router.post("/consult/stream")
 async def consult_stream(payload: ConsultRequest, request: Request) -> StreamingResponse:
+    reminder_response = await _try_handle_reminder(payload, request)
+    if reminder_response:
+        async def reminder_events() -> AsyncIterator[str]:
+            yield _to_ndjson(
+                {
+                    "type": "status",
+                    "stage": "agent",
+                    "message": "正在处理定时任务",
+                }
+            )
+            for chunk in _iter_answer_chunks(reminder_response.answer):
+                yield _to_ndjson({"type": "answer_delta", "delta": chunk})
+            yield _to_ndjson(
+                {
+                    "type": "complete",
+                    **reminder_response.model_dump(by_alias=True),
+                }
+            )
+
+        return StreamingResponse(reminder_events(), media_type="application/x-ndjson")
+
     graph = request.app.state.graph
 
     async def events() -> AsyncIterator[str]:
@@ -119,3 +155,119 @@ def _merge_state(state: dict[str, Any], update: dict[str, Any]) -> None:
             continue
 
         state[key] = value
+
+
+async def _try_handle_reminder(payload: ConsultRequest, request: Request) -> ConsultResponse | None:
+    question = payload.question.strip()
+    previous_confirmation = _find_previous_confirmation(payload)
+    if is_confirmation(question) and previous_confirmation:
+        answer = ""
+        traces: list[Any] = []
+        with trace_node(
+            "cron_job_execute",
+            {
+                "question": question,
+                "previousConfirmation": previous_confirmation,
+                "sessionId": payload.session_id,
+            },
+        ) as rec:
+            plan = build_plan_from_text(
+                text=previous_confirmation,
+                medicines=payload.medicines,
+                members=payload.members,
+                session_id=payload.session_id,
+                user_id=payload.user_id,
+                household_id=payload.household_id,
+                now=payload.now,
+                timezone_name=payload.timezone,
+            )
+            if plan.missing_fields:
+                answer = missing_fields_text(plan.missing_fields)
+                rec.set_output({"created": False, "missingFields": plan.missing_fields})
+            elif not payload.household_id:
+                answer = "当前家庭信息缺失，暂时无法创建定时任务。"
+                rec.set_output({"created": False, "reason": "missing_household_id"})
+            else:
+                tool = CronJobTool(request.app.state.settings)
+                idempotency_key = build_idempotency_key(payload.session_id, payload.user_id, plan)
+                try:
+                    result = await tool.create_job(
+                        plan=plan,
+                        user_id=payload.user_id,
+                        household_id=payload.household_id,
+                        idempotency_key=idempotency_key,
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    answer = f"定时任务创建失败：{exc}"
+                    rec.set_output({"created": False, "error": str(exc)})
+                else:
+                    rec.set_output({"created": True, "jobId": result.get("id"), "taskType": plan.task_type})
+                    answer = f"已设置：{result.get('title', plan.title)}。你可以在个人中心的定时任务中查看和管理。"
+            pass
+        traces = [rec.step]
+        return _reminder_response(answer=answer, traces=traces)
+
+    if not is_reminder_intent(question, payload.medicines):
+        return None
+
+    answer = ""
+    traces: list[Any] = []
+    with trace_node(
+        "cron_job_plan",
+        {
+            "question": question,
+            "sessionId": payload.session_id,
+            "medicineCount": len(payload.medicines),
+            "memberCount": len(payload.members),
+        },
+    ) as rec:
+        if not is_supported_reminder(question, payload.medicines):
+            answer = "我只能设置家庭药箱相关提醒，比如吃药、量体温、药品过期或库存提醒。"
+            rec.set_output({"allowed": False, "reason": "out_of_scope"})
+        else:
+            plan = build_plan_from_text(
+                text=question,
+                medicines=payload.medicines,
+                members=payload.members,
+                session_id=payload.session_id,
+                user_id=payload.user_id,
+                household_id=payload.household_id,
+                now=payload.now,
+                timezone_name=payload.timezone,
+            )
+            if plan.missing_fields:
+                answer = missing_fields_text(plan.missing_fields)
+                rec.set_output({"allowed": True, "complete": False, "missingFields": plan.missing_fields})
+            else:
+                answer = confirmation_text(plan)
+                rec.set_output(
+                    {
+                        "allowed": True,
+                        "complete": True,
+                        "taskType": plan.task_type,
+                        "scheduleType": plan.schedule_type,
+                        "medicineId": plan.medicine_id,
+                        "times": plan.times,
+                        "runAt": plan.run_at,
+                        "everySeconds": plan.every_seconds,
+                    }
+                )
+        pass
+    traces = [rec.step]
+    return _reminder_response(answer=answer, traces=traces)
+
+
+def _find_previous_confirmation(payload: ConsultRequest) -> str | None:
+    for message in reversed(payload.history or []):
+        if message.role == "ASSISTANT" and "请确认：" in message.content and "回复“确认”" in message.content:
+            return message.content
+    return None
+
+
+def _reminder_response(*, answer: str, traces: list[Any]) -> ConsultResponse:
+    return ConsultResponse(
+        answer=answer,
+        recommends=[],
+        disclaimer="定时提醒仅用于辅助记录和提示，不替代医生或药师建议。",
+        traces=[trace for trace in traces if trace is not None],
+    )

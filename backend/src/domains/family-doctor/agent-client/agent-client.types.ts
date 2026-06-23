@@ -41,9 +41,23 @@ export type AgentTraceStep = {
 export type AgentConsultInput = {
   sessionId: string;
   question: string;
+  userId?: string;
+  householdId?: string;
   medicines: AgentMedicineBrief[];
+  members?: Array<{
+    id: string;
+    displayName: string;
+    userId?: string;
+    role?: string;
+  }>;
+  history?: Array<{
+    role: 'USER' | 'ASSISTANT';
+    content: string;
+  }>;
   userProfile?: AgentUserProfile | null;
   allowRxRecommendation?: boolean;
+  timezone?: string;
+  now?: string;
 };
 
 export type AgentConsultOutput = {

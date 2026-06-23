@@ -100,6 +100,36 @@ type PageResult<T> = {
   pageSize: number;
 };
 
+type BackendCronJob = {
+  id: string;
+  userId?: string | null;
+  householdId: string;
+  memberId?: string | null;
+  type: "cron" | "every" | "at";
+  taskType: "medicine" | "temperature" | "cabinet";
+  title: string;
+  status: "enabled" | "disabled" | "expired";
+  cronExpression?: string | null;
+  everySeconds?: number | null;
+  runAt?: string | null;
+  timezone: string;
+  payload?: Record<string, unknown> | null;
+  source: "user_agent" | "system";
+  nextRunAt?: string | null;
+  lastRunAt?: string | null;
+  virtual?: boolean;
+};
+
+type BackendCronJobExecution = {
+  id: string;
+  jobId: string;
+  status: "success" | "failed" | "skipped";
+  startedAt: string;
+  finishedAt?: string | null;
+  result?: Record<string, unknown> | null;
+  errorMessage?: string | null;
+};
+
 export type AppHousehold = {
   id: string;
   name: string;
@@ -218,6 +248,29 @@ export type RecognizedMedicineResult = Medicine & {
   confidence?: number;
   rawText?: string;
   warnings?: string[];
+};
+
+export type AppCronJob = {
+  id: string;
+  type: "cron" | "every" | "at";
+  taskType: "medicine" | "temperature" | "cabinet";
+  title: string;
+  status: "enabled" | "disabled" | "expired";
+  scheduleText: string;
+  source: "user_agent" | "system";
+  nextRunAt?: string;
+  lastRunAt?: string;
+  virtual?: boolean;
+};
+
+export type AppCronJobExecution = {
+  id: string;
+  jobId: string;
+  status: "success" | "failed" | "skipped";
+  startedAt: string;
+  finishedAt?: string | null;
+  result?: Record<string, unknown> | null;
+  errorMessage?: string | null;
 };
 
 let sessionState: AppSessionState | null = null;
@@ -446,6 +499,44 @@ function toHistorySession(item: BackendConsultationSession, messages: ChatMessag
   };
 }
 
+function toAppCronJob(item: BackendCronJob): AppCronJob {
+  return {
+    id: item.id,
+    type: item.type,
+    taskType: item.taskType,
+    title: item.title,
+    status: item.status,
+    scheduleText: formatCronSchedule(item),
+    source: item.source,
+    nextRunAt: item.nextRunAt ? formatDateTime(item.nextRunAt) : undefined,
+    lastRunAt: item.lastRunAt ? formatDateTime(item.lastRunAt) : undefined,
+    virtual: item.virtual === true,
+  };
+}
+
+function formatCronSchedule(item: BackendCronJob) {
+  if (item.type === "at") {
+    return item.runAt ? `单次 ${formatDateTime(item.runAt)}` : "单次提醒";
+  }
+  if (item.type === "every") {
+    const hours = item.everySeconds ? Math.round(item.everySeconds / 3600) : 0;
+    return hours > 0 ? `每 ${hours} 小时` : "间隔提醒";
+  }
+  return item.cronExpression ? `周期 ${item.cronExpression}` : "每天 09:00";
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
 export const appApi = {
   async restoreSession() {
     return ensureSession();
@@ -629,5 +720,28 @@ export const appApi = {
     const response = await httpClient.getJson<BackendConsultationDetail>(`/consultation/sessions/${id}`);
     const messages = response.messages.map(toChatMessage);
     return toHistorySession(response, messages);
+  },
+
+  async listCronJobs(params?: { page?: number; pageSize?: number }) {
+    const search = new URLSearchParams();
+    if (params?.page) search.set("page", String(params.page));
+    if (params?.pageSize) search.set("pageSize", String(params.pageSize));
+
+    const suffix = search.toString() ? `?${search.toString()}` : "";
+    const response = await httpClient.getJson<PageResult<BackendCronJob>>(`/cron-jobs${suffix}`);
+    return response.items.map(toAppCronJob);
+  },
+
+  async updateCronJobStatus(jobId: string, status: "enabled" | "disabled" | "expired") {
+    const response = await httpClient.patchJson<BackendCronJob>(`/cron-jobs/${jobId}/status`, { status });
+    return toAppCronJob(response);
+  },
+
+  async deleteCronJob(jobId: string) {
+    return httpClient.deleteJson<{ success: boolean }>(`/cron-jobs/${jobId}`);
+  },
+
+  async listCronJobExecutions(jobId: string) {
+    return httpClient.getJson<AppCronJobExecution[]>(`/cron-jobs/${jobId}/executions`);
   },
 };

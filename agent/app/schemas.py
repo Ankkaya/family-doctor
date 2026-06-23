@@ -32,6 +32,18 @@ class UserProfile(_CamelModel):
     medication_history: str | None = Field(default=None, alias="medicationHistory")
 
 
+class MemberBrief(_CamelModel):
+    id: str
+    display_name: str = Field(alias="displayName")
+    user_id: str | None = Field(default=None, alias="userId")
+    role: str | None = None
+
+
+class ConversationMessageBrief(_CamelModel):
+    role: Literal["USER", "ASSISTANT"]
+    content: str
+
+
 class Recommend(_CamelModel):
     medicine_id: str = Field(alias="medicineId")
     name: str
@@ -67,9 +79,15 @@ class TraceStep(_CamelModel):
 class ConsultRequest(_CamelModel):
     session_id: str = Field(alias="sessionId")
     question: str
+    user_id: str | None = Field(default=None, alias="userId")
+    household_id: str | None = Field(default=None, alias="householdId")
     medicines: list[MedicineBrief] = Field(default_factory=list)
+    members: list[MemberBrief] = Field(default_factory=list)
+    history: list[ConversationMessageBrief] = Field(default_factory=list)
     user_profile: UserProfile | None = Field(default=None, alias="userProfile")
     allow_rx_recommendation: bool = Field(default=False, alias="allowRxRecommendation")
+    timezone: str = "Asia/Shanghai"
+    now: str | None = None
 
 
 class ConsultResponse(_CamelModel):
