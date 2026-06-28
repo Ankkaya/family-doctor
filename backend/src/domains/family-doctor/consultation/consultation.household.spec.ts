@@ -39,7 +39,16 @@ describe('ConsultationService household isolation', () => {
     const householdsService = {
       listMembers: jest.fn().mockResolvedValue([]),
     };
-    const service = new ConsultationService(prisma as any, cabinetService as any, agentClient as any, householdsService as any);
+    const ttsService = {
+      synthesize: jest.fn(),
+    };
+    const service = new ConsultationService(
+      prisma as any,
+      cabinetService as any,
+      agentClient as any,
+      householdsService as any,
+      ttsService as any,
+    );
     return { service, prisma, cabinetService, agentClient };
   }
 

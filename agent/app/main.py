@@ -19,8 +19,10 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     llm = get_llm_provider(settings)
     graph = build_graph(llm=llm, disclaimer=settings.disclaimer)
+    stream_graph = build_graph(llm=llm, disclaimer=settings.disclaimer, include_render=False)
     app.state.llm = llm
     app.state.graph = graph
+    app.state.stream_graph = stream_graph
     app.state.settings = settings
     due_job_task = asyncio.create_task(run_due_job_scheduler(settings))
     expiry_task = asyncio.create_task(run_system_expiry_scheduler(settings))

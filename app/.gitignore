@@ -2,9 +2,15 @@ node_modules
 dist
 .DS_Store
 *.log
+*.tsbuildinfo
+.vite
+coverage
 src-tauri/target
 src-tauri/gen
 src-tauri/.cargo
 android
 gen
-
+vite.config.js
+vite.config.d.ts
+tailwind.config.js
+tailwind.config.d.ts

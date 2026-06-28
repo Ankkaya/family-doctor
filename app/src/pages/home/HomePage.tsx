@@ -62,6 +62,7 @@ export function HomePage() {
   const authLoading = useAppStore((state) => state.authLoading);
   const familyLoading = useAppStore((state) => state.familyLoading);
   const chatLoading = useAppStore((state) => state.chatLoading);
+  const voiceTranscribing = useAppStore((state) => state.voiceTranscribing);
   const medicinesLoading = useAppStore((state) => state.medicinesLoading);
   const recognitionLoading = useAppStore((state) => state.recognitionLoading);
   const historyLoading = useAppStore((state) => state.historyLoading);
@@ -77,6 +78,7 @@ export function HomePage() {
   const loadReminders = useAppStore((state) => state.loadReminders);
   const loadMembers = useAppStore((state) => state.loadMembers);
   const recognizeMedicineImages = useAppStore((state) => state.recognizeMedicineImages);
+  const transcribeChatAudio = useAppStore((state) => state.transcribeChatAudio);
   const clearRecognizedMedicine = useAppStore((state) => state.clearRecognizedMedicine);
   const initializeIdentity = useAppStore((state) => state.initializeIdentity);
   const login = useAppStore((state) => state.login);
@@ -333,7 +335,9 @@ export function HomePage() {
               medicines={medicines}
               user={appUser}
               isSending={chatLoading}
+              isTranscribing={voiceTranscribing}
               onInputChange={setChatInput}
+              onAudioRecorded={transcribeChatAudio}
               onSend={handleSendChat}
               onOpenMedicine={openMedicine}
             />

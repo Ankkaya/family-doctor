@@ -1,0 +1,15 @@
+node_modules
+dist
+coverage
+.vite
+.turbo
+pnpm-lock.yaml
+agent/uv.lock
+app/src-tauri/target
+app/src-tauri/gen
+app/android
+backend/generated
+backend/dist
+frontend/dist
+app/dist
+*.tsbuildinfo

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import AsyncIterator
 from typing import TypeVar
 
 from openai import AsyncOpenAI
@@ -27,6 +28,21 @@ class OpenAICompatProvider:
             temperature=0.3,
         )
         return (resp.choices[0].message.content or "").strip()
+
+    async def chat_stream(self, *, system: str, user: str) -> AsyncIterator[str]:
+        stream = await self._client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            temperature=0.3,
+            stream=True,
+        )
+        async for event in stream:
+            delta = event.choices[0].delta.content
+            if delta:
+                yield delta
 
     async def structured(self, *, system: str, user: str, schema: type[T]) -> T:
         """以 JSON mode 拿结构化输出。生产环境可改为 function calling 或 Responses API。"""

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from collections.abc import Generator
 import json
 from typing import TypeVar
@@ -46,7 +47,10 @@ SAMPLE_MEDICINES = [
 
 def _keyword_symptoms(text: str) -> list[str]:
     candidates = ["头痛", "头疼", "发热", "咳嗽", "咽痛", "腹泻", "恶心", "呕吐", "流涕", "鼻塞", "口腔溃疡"]
-    return [kw for kw in candidates if kw in text]
+    symptoms = [kw for kw in candidates if kw in text]
+    if not any(item in symptoms for item in ["头痛", "头疼"]) and "头" in text and ("疼" in text or "痛" in text):
+        symptoms.append("头痛")
+    return symptoms
 
 
 class FakeProvider:
@@ -55,6 +59,11 @@ class FakeProvider:
 
     async def chat(self, *, system: str, user: str) -> str:  # noqa: ARG002
         return "测试模型回复：请结合症状休息观察，必要时就医。"
+
+    async def chat_stream(self, *, system: str, user: str) -> AsyncIterator[str]:  # noqa: ARG002
+        answer = await self.chat(system=system, user=user)
+        for index in range(0, len(answer), 8):
+            yield answer[index:index + 8]
 
     async def structured(self, *, system: str, user: str, schema: type[T]) -> T:  # noqa: ARG002
         if schema is ParsedSymptoms:

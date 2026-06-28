@@ -7,6 +7,12 @@ from typing import Any
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
+from ..graph.nodes.render import (
+    RENDER_PROMPT_KEY,
+    RENDER_PROMPT_VERSION,
+    RENDER_SYSTEM,
+    build_render_plan,
+)
 from ..schemas import ConsultRequest, ConsultResponse
 from ..tools.cron_job_tool import (
     CronJobTool,
@@ -18,6 +24,7 @@ from ..tools.cron_job_tool import (
     is_supported_reminder,
     missing_fields_text,
 )
+from ..tracing import trace_node
 from ..tracing import trace_node
 
 router = APIRouter()
@@ -82,7 +89,9 @@ async def consult_stream(payload: ConsultRequest, request: Request) -> Streaming
 
         return StreamingResponse(reminder_events(), media_type="application/x-ndjson")
 
-    graph = request.app.state.graph
+    graph = request.app.state.stream_graph
+    llm = request.app.state.llm
+    settings = request.app.state.settings
 
     async def events() -> AsyncIterator[str]:
         state: dict[str, Any] = {
@@ -116,19 +125,65 @@ async def consult_stream(payload: ConsultRequest, request: Request) -> Streaming
                     }
                 )
 
+        yield _to_ndjson(
+            {
+                "type": "status",
+                "stage": "agent",
+                "message": NODE_STATUS_MESSAGES["render"],
+            }
+        )
+
+        plan = build_render_plan(state)
+        with trace_node(
+            "render",
+            {
+                "emergency": state["parsed"].emergency,
+                "recommendCount": len(plan.recommends),
+                "riskLevel": state.get("risk_level", "unknown"),
+                "promptKey": RENDER_PROMPT_KEY,
+                "promptVersion": RENDER_PROMPT_VERSION,
+                "streaming": True,
+            },
+        ) as rec:
+            answer_parts: list[str] = []
+
+            if plan.prompt_used and plan.prompt_user:
+                async for chunk in llm.chat_stream(system=RENDER_SYSTEM, user=plan.prompt_user):
+                    answer_parts.append(chunk)
+                    yield _to_ndjson(
+                        {
+                            "type": "answer_delta",
+                            "delta": chunk,
+                        }
+                    )
+            else:
+                answer_parts.append(plan.answer or "")
+                for chunk in _iter_answer_chunks(answer_parts[0]):
+                    yield _to_ndjson(
+                        {
+                            "type": "answer_delta",
+                            "delta": chunk,
+                        }
+                    )
+
+            answer = "".join(answer_parts).strip()
+            rec.set_output({
+                "answerLength": len(answer),
+                "recommendCount": len(plan.recommends),
+                "promptUsed": plan.prompt_used,
+                "systemPrompt": RENDER_SYSTEM if plan.prompt_used else None,
+                "userPrompt": plan.prompt_user,
+            })
+            rec.set_llm(model=llm.model)
+        state.setdefault("traces", [])
+        state["traces"].append(rec.step)
+
         output = ConsultResponse(
-            answer=state["answer"],
-            recommends=state["recommends"],
-            disclaimer=state["disclaimer"],
+            answer=answer,
+            recommends=plan.recommends,
+            disclaimer=settings.disclaimer,
             traces=state["traces"],
         )
-        for chunk in _iter_answer_chunks(output.answer):
-            yield _to_ndjson(
-                {
-                    "type": "answer_delta",
-                    "delta": chunk,
-                }
-            )
         yield _to_ndjson(
             {
                 "type": "complete",

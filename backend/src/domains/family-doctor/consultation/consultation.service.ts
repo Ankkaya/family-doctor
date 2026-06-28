@@ -6,6 +6,7 @@ import { AgentClientService } from '../agent-client/agent-client.service';
 import { AgentTraceStep, AgentUserProfile, AgentRecommend } from '../agent-client/agent-client.types';
 import { CabinetService } from '../cabinet/cabinet.service';
 import { CurrentHousehold, HouseholdsService } from '@/domains/households/households.service';
+import { TencentTtsService } from '../voice/tencent-tts.service';
 import { AskConsultationDto } from './dto/ask-consultation.dto';
 import { QueryConsultationDto } from './dto/query-consultation.dto';
 import {
@@ -123,6 +124,25 @@ export type ConsultationStreamEvent =
       answer: string;
       recommends: AgentRecommend[];
       disclaimer: string;
+    }
+  | {
+      type: 'audio_meta';
+      codec: 'mp3' | 'wav';
+      sampleRate: number;
+    }
+  | {
+      type: 'audio_chunk';
+      seq: number;
+      text: string;
+      audioBase64: string;
+      codec: 'mp3' | 'wav';
+    }
+  | {
+      type: 'audio_done';
+    }
+  | {
+      type: 'audio_error';
+      message: string;
     };
 
 function normalizeStreamStage(stage?: string): ConsultationStreamStage {
@@ -140,6 +160,7 @@ export class ConsultationService {
     private readonly cabinetService: CabinetService,
     private readonly agentClient: AgentClientService,
     private readonly householdsService: HouseholdsService,
+    private readonly ttsService: TencentTtsService,
   ) {}
 
   async ask(dto: AskConsultationDto, current: CurrentHousehold) {
@@ -208,6 +229,9 @@ export class ConsultationService {
     const sessionId = dto.sessionId?.trim() || randomUUID();
     const assistantMessageId = randomUUID();
     const title = this.buildSessionTitle(question);
+    const audioStreamer = dto.audio?.enabled === true
+      ? this.createAudioStreamer(dto.audio?.codec || 'mp3', onEvent)
+      : null;
 
     if (dto.sessionId?.trim()) {
       await this.assertSessionAccess(sessionId, current);
@@ -258,6 +282,7 @@ export class ConsultationService {
 
         if (event.type === 'answer_delta') {
           await onEvent({ type: 'answer_delta', delta: event.delta });
+          audioStreamer?.push(event.delta);
         }
       },
     );
@@ -280,6 +305,10 @@ export class ConsultationService {
       recommends: agentResponse.recommends,
       disclaimer: agentResponse.disclaimer,
     });
+
+    if (audioStreamer) {
+      await audioStreamer.finish();
+    }
   }
 
   async findSessions(query: QueryConsultationDto) {
@@ -629,6 +658,95 @@ export class ConsultationService {
 
     const compact = normalized.replace(/\s+/g, '').toLowerCase();
     return EMPTY_PROFILE_VALUES.has(compact) ? null : normalized;
+  }
+
+  private createAudioStreamer(
+    codec: 'mp3' | 'wav',
+    onEvent: (event: ConsultationStreamEvent) => Promise<void> | void,
+  ) {
+    let pendingText = '';
+    let sequence = 0;
+    let metadataSent = false;
+    let chain = Promise.resolve();
+    let failed = false;
+
+    const enqueue = (text: string) => {
+      const normalized = text.replace(/\s+/g, ' ').trim();
+      if (!normalized || failed) return;
+
+      chain = chain.then(async () => {
+        try {
+          const audio = await this.ttsService.synthesize({ text: normalized, codec });
+          if (!audio.audioBase64) return;
+
+          if (!metadataSent) {
+            metadataSent = true;
+            await onEvent({
+              type: 'audio_meta',
+              codec: audio.codec,
+              sampleRate: audio.sampleRate,
+            });
+          }
+
+          sequence += 1;
+          await onEvent({
+            type: 'audio_chunk',
+            seq: sequence,
+            text: normalized,
+            audioBase64: audio.audioBase64,
+            codec: audio.codec,
+          });
+        } catch (error) {
+          failed = true;
+          await onEvent({
+            type: 'audio_error',
+            message: error instanceof Error ? error.message : '语音合成失败',
+          });
+        }
+      });
+    };
+
+    return {
+      push: (delta: string) => {
+        pendingText += delta;
+        const { ready, rest } = this.extractSpeakableSentences(pendingText);
+        pendingText = rest;
+        ready.forEach(enqueue);
+      },
+      finish: async () => {
+        const rest = pendingText.trim();
+        pendingText = '';
+        if (rest) {
+          enqueue(rest);
+        }
+        await chain;
+        if (!failed && metadataSent) {
+          await onEvent({ type: 'audio_done' });
+        }
+      },
+    };
+  }
+
+  private extractSpeakableSentences(text: string) {
+    const ready: string[] = [];
+    let start = 0;
+
+    for (let index = 0; index < text.length; index += 1) {
+      const char = text[index];
+      const sentenceLength = index - start + 1;
+      if (/[。！？!?；;]/.test(char) || sentenceLength >= 80) {
+        const sentence = text.slice(start, index + 1).trim();
+        if (sentence) {
+          ready.push(sentence);
+        }
+        start = index + 1;
+      }
+    }
+
+    return {
+      ready,
+      rest: text.slice(start),
+    };
   }
 
   private buildTraceDetail(trace: TraceRow): TraceDetailRow {

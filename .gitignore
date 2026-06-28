@@ -10,4 +10,26 @@ app/.env.local
 
 node_modules/
 dist/
+coverage/
+.turbo/
+.vite/
 *.log
+
+# This repository uses pnpm workspaces.
+package-lock.json
+yarn.lock
+
+*.tsbuildinfo
+
+# Generated JavaScript/type output from TypeScript configs.
+app/vite.config.js
+app/vite.config.d.ts
+app/tailwind.config.js
+app/tailwind.config.d.ts
+
+# Tauri and platform build output.
+app/src-tauri/target/
+app/src-tauri/gen/
+app/src-tauri/.cargo/
+app/android/
+app/gen/

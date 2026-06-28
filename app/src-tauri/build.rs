@@ -34,13 +34,21 @@ listOf(
 }
 "#;
 
+const ANDROID_RECORD_AUDIO_PERMISSION: &str =
+    r#"    <uses-permission android:name="android.permission.RECORD_AUDIO" />"#;
+
 fn main() {
     tauri_build::build();
 
     println!("cargo:rerun-if-changed=gen/android/build.gradle.kts");
+    println!("cargo:rerun-if-changed=gen/android/app/src/main/AndroidManifest.xml");
 
     if let Err(error) = ensure_android_gradle_compat_patch() {
         println!("cargo:warning=failed to apply Android Gradle compatibility patch: {error}");
+    }
+
+    if let Err(error) = ensure_android_record_audio_permission() {
+        println!("cargo:warning=failed to apply Android microphone permission patch: {error}");
     }
 }
 
@@ -59,4 +67,35 @@ fn ensure_android_gradle_compat_patch() -> io::Result<()> {
 
     let updated = format!("{current}{ANDROID_GRADLE_COMPAT_PATCH}");
     fs::write(build_gradle_path, updated)
+}
+
+fn ensure_android_record_audio_permission() -> io::Result<()> {
+    let manifest_dir = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
+    let manifest_path = manifest_dir
+        .join("gen")
+        .join("android")
+        .join("app")
+        .join("src")
+        .join("main")
+        .join("AndroidManifest.xml");
+
+    if !manifest_path.exists() {
+        return Ok(());
+    }
+
+    let current = fs::read_to_string(&manifest_path)?;
+    if current.contains("android.permission.RECORD_AUDIO") {
+        return Ok(());
+    }
+
+    let updated = current.replacen(
+        r#"    <uses-permission android:name="android.permission.INTERNET" />"#,
+        &format!(
+            r#"    <uses-permission android:name="android.permission.INTERNET" />
+{}"#,
+            ANDROID_RECORD_AUDIO_PERMISSION
+        ),
+        1,
+    );
+    fs::write(manifest_path, updated)
 }

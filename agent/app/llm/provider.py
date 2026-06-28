@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from typing import Protocol, TypeVar
 
 from pydantic import BaseModel
@@ -13,6 +14,8 @@ class LLMProvider(Protocol):
     model: str
 
     async def chat(self, *, system: str, user: str) -> str: ...
+
+    async def chat_stream(self, *, system: str, user: str) -> AsyncIterator[str]: ...
 
     async def structured(self, *, system: str, user: str, schema: type[T]) -> T: ...
 

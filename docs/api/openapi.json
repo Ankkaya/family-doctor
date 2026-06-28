@@ -1,0 +1,5353 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "AppController_health",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "App"
+        ]
+      }
+    },
+    "/files/upload": {
+      "post": {
+        "operationId": "MinioController_uploadFile[0]",
+        "parameters": [
+          {
+            "name": "path",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "文件"
+                  },
+                  "path": {
+                    "type": "string",
+                    "description": "存储路径（可选）"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "上传单个文件",
+        "tags": [
+          "后台接口/文件存储"
+        ]
+      }
+    },
+    "/api/files/upload": {
+      "post": {
+        "operationId": "MinioController_uploadFile[1]",
+        "parameters": [
+          {
+            "name": "path",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "文件"
+                  },
+                  "path": {
+                    "type": "string",
+                    "description": "存储路径（可选）"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "上传单个文件",
+        "tags": [
+          "后台接口/文件存储"
+        ]
+      }
+    },
+    "/files/upload/multiple": {
+      "post": {
+        "operationId": "MinioController_uploadFiles[0]",
+        "parameters": [
+          {
+            "name": "path",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "binary"
+                    },
+                    "description": "文件列表"
+                  },
+                  "path": {
+                    "type": "string",
+                    "description": "存储路径（可选）"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "上传多个文件",
+        "tags": [
+          "后台接口/文件存储"
+        ]
+      }
+    },
+    "/api/files/upload/multiple": {
+      "post": {
+        "operationId": "MinioController_uploadFiles[1]",
+        "parameters": [
+          {
+            "name": "path",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "binary"
+                    },
+                    "description": "文件列表"
+                  },
+                  "path": {
+                    "type": "string",
+                    "description": "存储路径（可选）"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "上传多个文件",
+        "tags": [
+          "后台接口/文件存储"
+        ]
+      }
+    },
+    "/files/url": {
+      "get": {
+        "operationId": "MinioController_getFileUrl[0]",
+        "parameters": [
+          {
+            "name": "filename",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "expiry",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取文件访问 URL",
+        "tags": [
+          "后台接口/文件存储"
+        ]
+      }
+    },
+    "/api/files/url": {
+      "get": {
+        "operationId": "MinioController_getFileUrl[1]",
+        "parameters": [
+          {
+            "name": "filename",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "expiry",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取文件访问 URL",
+        "tags": [
+          "后台接口/文件存储"
+        ]
+      }
+    },
+    "/files/preview": {
+      "get": {
+        "operationId": "MinioController_previewFile[0]",
+        "parameters": [
+          {
+            "name": "filename",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "预览文件",
+        "tags": [
+          "后台接口/文件存储"
+        ]
+      }
+    },
+    "/api/files/preview": {
+      "get": {
+        "operationId": "MinioController_previewFile[1]",
+        "parameters": [
+          {
+            "name": "filename",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "预览文件",
+        "tags": [
+          "后台接口/文件存储"
+        ]
+      }
+    },
+    "/files/delete": {
+      "delete": {
+        "operationId": "MinioController_deleteFile[0]",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "删除文件",
+        "tags": [
+          "后台接口/文件存储"
+        ]
+      }
+    },
+    "/api/files/delete": {
+      "delete": {
+        "operationId": "MinioController_deleteFile[1]",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "删除文件",
+        "tags": [
+          "后台接口/文件存储"
+        ]
+      }
+    },
+    "/files/delete/batch": {
+      "delete": {
+        "operationId": "MinioController_deleteFiles[0]",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "批量删除文件",
+        "tags": [
+          "后台接口/文件存储"
+        ]
+      }
+    },
+    "/api/files/delete/batch": {
+      "delete": {
+        "operationId": "MinioController_deleteFiles[1]",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "批量删除文件",
+        "tags": [
+          "后台接口/文件存储"
+        ]
+      }
+    },
+    "/files/list": {
+      "get": {
+        "operationId": "MinioController_listFiles[0]",
+        "parameters": [
+          {
+            "name": "prefix",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "recursive",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "列出文件",
+        "tags": [
+          "后台接口/文件存储"
+        ]
+      }
+    },
+    "/api/files/list": {
+      "get": {
+        "operationId": "MinioController_listFiles[1]",
+        "parameters": [
+          {
+            "name": "prefix",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "recursive",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "列出文件",
+        "tags": [
+          "后台接口/文件存储"
+        ]
+      }
+    },
+    "/files/stat": {
+      "get": {
+        "operationId": "MinioController_getFileStat[0]",
+        "parameters": [
+          {
+            "name": "filename",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取文件信息",
+        "tags": [
+          "后台接口/文件存储"
+        ]
+      }
+    },
+    "/api/files/stat": {
+      "get": {
+        "operationId": "MinioController_getFileStat[1]",
+        "parameters": [
+          {
+            "name": "filename",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取文件信息",
+        "tags": [
+          "后台接口/文件存储"
+        ]
+      }
+    },
+    "/files/presigned-upload": {
+      "get": {
+        "operationId": "MinioController_getPresignedUploadUrl[0]",
+        "parameters": [
+          {
+            "name": "filename",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "expiry",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取预签名上传 URL（用于前端直传）",
+        "tags": [
+          "后台接口/文件存储"
+        ]
+      }
+    },
+    "/api/files/presigned-upload": {
+      "get": {
+        "operationId": "MinioController_getPresignedUploadUrl[1]",
+        "parameters": [
+          {
+            "name": "filename",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "expiry",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取预签名上传 URL（用于前端直传）",
+        "tags": [
+          "后台接口/文件存储"
+        ]
+      }
+    },
+    "/files/exists": {
+      "get": {
+        "operationId": "MinioController_fileExists[0]",
+        "parameters": [
+          {
+            "name": "filename",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "检查文件是否存在",
+        "tags": [
+          "后台接口/文件存储"
+        ]
+      }
+    },
+    "/api/files/exists": {
+      "get": {
+        "operationId": "MinioController_fileExists[1]",
+        "parameters": [
+          {
+            "name": "filename",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "检查文件是否存在",
+        "tags": [
+          "后台接口/文件存储"
+        ]
+      }
+    },
+    "/auth/public-key": {
+      "get": {
+        "operationId": "AuthController_getPublicKey",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "获取登录密码加密公钥（RSA-2048，PKCS1）",
+        "tags": [
+          "后台接口/认证管理"
+        ]
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "operationId": "AuthController_register",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Register a new user",
+        "tags": [
+          "后台接口/认证管理"
+        ]
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "operationId": "AuthController_login",
+        "parameters": [
+          {
+            "name": "user-agent",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Login",
+        "tags": [
+          "后台接口/认证管理"
+        ]
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "operationId": "AuthController_refresh",
+        "parameters": [
+          {
+            "name": "user-agent",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Refresh access token",
+        "tags": [
+          "后台接口/认证管理"
+        ]
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "operationId": "AuthController_logout",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Logout and revoke cached tokens",
+        "tags": [
+          "后台接口/认证管理"
+        ]
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "operationId": "AuthController_getProfile",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get current user",
+        "tags": [
+          "后台接口/认证管理"
+        ]
+      }
+    },
+    "/users": {
+      "post": {
+        "operationId": "UsersController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "创建用户",
+        "tags": [
+          "后台接口/用户管理"
+        ]
+      },
+      "get": {
+        "operationId": "UsersController_findAll",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取用户列表",
+        "tags": [
+          "后台接口/用户管理"
+        ]
+      }
+    },
+    "/users/me": {
+      "get": {
+        "operationId": "UsersController_getCurrentUser",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取当前登录用户信息",
+        "tags": [
+          "后台接口/用户管理"
+        ]
+      }
+    },
+    "/users/{id}": {
+      "get": {
+        "operationId": "UsersController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "根据ID获取用户详情",
+        "tags": [
+          "后台接口/用户管理"
+        ]
+      },
+      "patch": {
+        "operationId": "UsersController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "更新用户信息",
+        "tags": [
+          "后台接口/用户管理"
+        ]
+      },
+      "delete": {
+        "operationId": "UsersController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "删除用户",
+        "tags": [
+          "后台接口/用户管理"
+        ]
+      }
+    },
+    "/users/{id}/password": {
+      "patch": {
+        "operationId": "UsersController_resetPassword",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetUserPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "重置用户密码",
+        "tags": [
+          "后台接口/用户管理"
+        ]
+      }
+    },
+    "/users/batch": {
+      "delete": {
+        "operationId": "UsersController_removeMany",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchIdsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "批量删除用户",
+        "tags": [
+          "后台接口/用户管理"
+        ]
+      }
+    },
+    "/users/{id}/roles": {
+      "get": {
+        "operationId": "UsersController_getUserRoles",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取用户的角色列表",
+        "tags": [
+          "后台接口/用户管理"
+        ]
+      },
+      "patch": {
+        "operationId": "UsersController_assignRoles",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "为用户分配角色",
+        "tags": [
+          "后台接口/用户管理"
+        ]
+      }
+    },
+    "/users/{id}/menus": {
+      "get": {
+        "operationId": "UsersController_getUserMenus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "format",
+            "required": false,
+            "in": "query",
+            "description": "返回格式：tree-树形(默认), flat-扁平",
+            "schema": {
+              "enum": [
+                "tree",
+                "flat"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取用户的菜单（聚合所有角色的菜单）",
+        "tags": [
+          "后台接口/用户管理"
+        ]
+      }
+    },
+    "/app/auth/anonymous": {
+      "post": {
+        "operationId": "AppAuthController_createAnonymousIdentity",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "App 创建匿名身份和默认家庭",
+        "tags": [
+          "App/认证"
+        ]
+      }
+    },
+    "/app/auth/register": {
+      "post": {
+        "operationId": "AppAuthController_register",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterAppUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "App 用户名密码注册，需系统注册码",
+        "tags": [
+          "App/认证"
+        ]
+      }
+    },
+    "/app/auth/login": {
+      "post": {
+        "operationId": "AppAuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginAppUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "App 用户名密码登录",
+        "tags": [
+          "App/认证"
+        ]
+      }
+    },
+    "/app/auth/refresh": {
+      "post": {
+        "operationId": "AppAuthController_refresh",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshAppTokenDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "App 刷新访问令牌",
+        "tags": [
+          "App/认证"
+        ]
+      }
+    },
+    "/app/auth/profile": {
+      "patch": {
+        "operationId": "AppAuthController_updateProfile",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAppProfileDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "App 更新当前用户个人资料",
+        "tags": [
+          "App/认证"
+        ]
+      }
+    },
+    "/app/auth/avatar": {
+      "post": {
+        "operationId": "AppAuthController_uploadAvatar",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "头像图片"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "App 上传当前用户头像",
+        "tags": [
+          "App/认证"
+        ]
+      }
+    },
+    "/admin/app-users": {
+      "get": {
+        "operationId": "AppUsersController_list",
+        "parameters": [
+          {
+            "name": "keyword",
+            "required": false,
+            "in": "query",
+            "description": "用户 ID、用户名、昵称、手机号、邮箱或默认家庭",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "用户状态",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "active",
+                "disabled"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "后台查询 App 用户列表",
+        "tags": [
+          "后台/App用户"
+        ]
+      }
+    },
+    "/admin/app-users/{id}": {
+      "get": {
+        "operationId": "AppUsersController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "后台查询 App 用户详情",
+        "tags": [
+          "后台/App用户"
+        ]
+      },
+      "delete": {
+        "operationId": "AppUsersController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "后台删除 App 用户",
+        "tags": [
+          "后台/App用户"
+        ]
+      }
+    },
+    "/admin/app-users/{id}/households": {
+      "get": {
+        "operationId": "AppUsersController_households",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "后台查询 App 用户加入的家庭",
+        "tags": [
+          "后台/App用户"
+        ]
+      }
+    },
+    "/admin/app-users/{id}/status": {
+      "patch": {
+        "operationId": "AppUsersController_updateStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAppUserStatusDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "后台启用或停用 App 用户",
+        "tags": [
+          "后台/App用户"
+        ]
+      }
+    },
+    "/admin/app-users/{id}/password": {
+      "patch": {
+        "operationId": "AppUsersController_resetPassword",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetAppUserPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "后台重置 App 用户密码",
+        "tags": [
+          "后台/App用户"
+        ]
+      }
+    },
+    "/app/households": {
+      "get": {
+        "operationId": "HouseholdsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "App 查询当前用户家庭列表",
+        "tags": [
+          "App/家庭"
+        ]
+      },
+      "post": {
+        "operationId": "HouseholdsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateHouseholdDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "App 创建家庭",
+        "tags": [
+          "App/家庭"
+        ]
+      }
+    },
+    "/app/households/join": {
+      "post": {
+        "operationId": "HouseholdsController_join",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JoinHouseholdDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "App 通过 6 位家庭邀请码加入家庭",
+        "tags": [
+          "App/家庭"
+        ]
+      }
+    },
+    "/app/households/{householdId}/members": {
+      "get": {
+        "operationId": "HouseholdsController_members",
+        "parameters": [
+          {
+            "name": "householdId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-household-id",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "App 查询家庭成员",
+        "tags": [
+          "App/家庭"
+        ]
+      }
+    },
+    "/app/households/{householdId}/members/{memberId}": {
+      "patch": {
+        "operationId": "HouseholdsController_updateMember",
+        "parameters": [
+          {
+            "name": "householdId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "memberId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateHouseholdMemberDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "App 家庭管理员编辑家庭成员",
+        "tags": [
+          "App/家庭"
+        ]
+      }
+    },
+    "/admin/households": {
+      "get": {
+        "operationId": "AdminHouseholdsController_list",
+        "parameters": [
+          {
+            "name": "keyword",
+            "required": false,
+            "in": "query",
+            "description": "家庭名、用户昵称或手机号",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "后台查询家庭列表",
+        "tags": [
+          "后台/家庭"
+        ]
+      }
+    },
+    "/admin/households/{id}": {
+      "get": {
+        "operationId": "AdminHouseholdsController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "后台查询家庭详情",
+        "tags": [
+          "后台/家庭"
+        ]
+      },
+      "delete": {
+        "operationId": "AdminHouseholdsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "后台删除家庭",
+        "tags": [
+          "后台/家庭"
+        ]
+      }
+    },
+    "/admin/households/{id}/members": {
+      "get": {
+        "operationId": "AdminHouseholdsController_members",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "后台查询家庭成员",
+        "tags": [
+          "后台/家庭"
+        ]
+      }
+    },
+    "/dictionaries/types": {
+      "post": {
+        "operationId": "DictionariesController_createType",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDictionaryTypeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DictionaryTypeVo"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "创建字典类型",
+        "tags": [
+          "后台接口/字典管理"
+        ]
+      },
+      "get": {
+        "operationId": "DictionariesController_findTypes",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "页码",
+            "schema": {
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "description": "每页数量",
+            "schema": {
+              "example": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "keyword",
+            "required": false,
+            "in": "query",
+            "description": "按名称或编码模糊查询",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "isEnabled",
+            "required": false,
+            "in": "query",
+            "description": "启用状态",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "查询字典类型列表",
+        "tags": [
+          "后台接口/字典管理"
+        ]
+      }
+    },
+    "/dictionaries/types/{id}": {
+      "get": {
+        "operationId": "DictionariesController_findType",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DictionaryTypeVo"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取字典类型详情",
+        "tags": [
+          "后台接口/字典管理"
+        ]
+      },
+      "patch": {
+        "operationId": "DictionariesController_updateType",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDictionaryTypeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DictionaryTypeVo"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "更新字典类型",
+        "tags": [
+          "后台接口/字典管理"
+        ]
+      },
+      "delete": {
+        "operationId": "DictionariesController_removeType",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DictionaryTypeVo"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "删除字典类型",
+        "tags": [
+          "后台接口/字典管理"
+        ]
+      }
+    },
+    "/dictionaries/types/{id}/items": {
+      "get": {
+        "operationId": "DictionariesController_findItemsByType",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "keyword",
+            "required": false,
+            "in": "query",
+            "description": "按标签或值模糊查询",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "isEnabled",
+            "required": false,
+            "in": "query",
+            "description": "启用状态",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DictionaryItemVo"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "查询字典类型下的字典项",
+        "tags": [
+          "后台接口/字典管理"
+        ]
+      }
+    },
+    "/dictionaries/code/{code}/items": {
+      "get": {
+        "operationId": "DictionariesController_findItemsByTypeCode",
+        "parameters": [
+          {
+            "name": "code",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "keyword",
+            "required": false,
+            "in": "query",
+            "description": "按标签或值模糊查询",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "isEnabled",
+            "required": false,
+            "in": "query",
+            "description": "启用状态",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DictionaryItemVo"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "按字典编码查询可用字典项",
+        "tags": [
+          "后台接口/字典管理"
+        ]
+      }
+    },
+    "/dictionaries/items": {
+      "post": {
+        "operationId": "DictionariesController_createItem",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDictionaryItemDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DictionaryItemVo"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "创建字典项",
+        "tags": [
+          "后台接口/字典管理"
+        ]
+      }
+    },
+    "/dictionaries/items/{id}": {
+      "patch": {
+        "operationId": "DictionariesController_updateItem",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDictionaryItemDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DictionaryItemVo"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "更新字典项",
+        "tags": [
+          "后台接口/字典管理"
+        ]
+      },
+      "delete": {
+        "operationId": "DictionariesController_removeItem",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DictionaryItemVo"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "删除字典项",
+        "tags": [
+          "后台接口/字典管理"
+        ]
+      }
+    },
+    "/roles": {
+      "post": {
+        "operationId": "RolesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRoleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "创建角色",
+        "tags": [
+          "后台接口/角色管理"
+        ]
+      },
+      "get": {
+        "operationId": "RolesController_findAll",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取角色列表",
+        "tags": [
+          "后台接口/角色管理"
+        ]
+      }
+    },
+    "/roles/{id}": {
+      "get": {
+        "operationId": "RolesController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "根据ID获取角色详情",
+        "tags": [
+          "后台接口/角色管理"
+        ]
+      },
+      "patch": {
+        "operationId": "RolesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRoleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "更新角色",
+        "tags": [
+          "后台接口/角色管理"
+        ]
+      },
+      "delete": {
+        "operationId": "RolesController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "删除角色",
+        "tags": [
+          "后台接口/角色管理"
+        ]
+      }
+    },
+    "/roles/batch": {
+      "delete": {
+        "operationId": "RolesController_removeMany",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchIdsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "批量删除角色",
+        "tags": [
+          "后台接口/角色管理"
+        ]
+      }
+    },
+    "/roles/{id}/menus": {
+      "get": {
+        "operationId": "RolesController_getRoleMenus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "format",
+            "required": false,
+            "in": "query",
+            "description": "返回格式：tree-树形(默认), flat-扁平",
+            "schema": {
+              "enum": [
+                "tree",
+                "flat"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取角色的菜单列表",
+        "tags": [
+          "后台接口/角色管理"
+        ]
+      },
+      "patch": {
+        "operationId": "RolesController_assignMenus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "为角色分配菜单",
+        "tags": [
+          "后台接口/角色管理"
+        ]
+      }
+    },
+    "/menus": {
+      "post": {
+        "operationId": "MenusController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMenuDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "创建菜单",
+        "tags": [
+          "后台接口/菜单管理"
+        ]
+      },
+      "get": {
+        "operationId": "MenusController_findAll",
+        "parameters": [
+          {
+            "name": "format",
+            "required": false,
+            "in": "query",
+            "description": "返回格式：tree-树形(默认), flat-扁平列表",
+            "schema": {
+              "enum": [
+                "tree",
+                "flat"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取菜单列表",
+        "tags": [
+          "后台接口/菜单管理"
+        ]
+      }
+    },
+    "/menus/{id}": {
+      "get": {
+        "operationId": "MenusController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "根据ID获取菜单详情",
+        "tags": [
+          "后台接口/菜单管理"
+        ]
+      },
+      "patch": {
+        "operationId": "MenusController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMenuDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "更新菜单",
+        "tags": [
+          "后台接口/菜单管理"
+        ]
+      },
+      "delete": {
+        "operationId": "MenusController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "删除菜单",
+        "tags": [
+          "后台接口/菜单管理"
+        ]
+      }
+    },
+    "/menus/batch": {
+      "delete": {
+        "operationId": "MenusController_removeMany",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchIdsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "批量删除菜单",
+        "tags": [
+          "后台接口/菜单管理"
+        ]
+      }
+    },
+    "/system-settings": {
+      "get": {
+        "operationId": "SystemSettingsController_findAll",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SystemSettingVo"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "获取系统设置列表",
+        "tags": [
+          "后台接口/系统设置"
+        ]
+      },
+      "post": {
+        "operationId": "SystemSettingsController_upsert",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertSystemSettingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemSettingVo"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "新增或更新系统设置",
+        "tags": [
+          "后台接口/系统设置"
+        ]
+      }
+    },
+    "/system-settings/category/{category}": {
+      "get": {
+        "operationId": "SystemSettingsController_findByCategory",
+        "parameters": [
+          {
+            "name": "category",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SystemSettingVo"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "按分类获取系统设置",
+        "tags": [
+          "后台接口/系统设置"
+        ]
+      }
+    },
+    "/system-logs/operations": {
+      "get": {
+        "operationId": "SystemLogsController_findOperationLogs",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "操作审计日志列表",
+        "tags": [
+          "后台接口/系统日志"
+        ]
+      }
+    },
+    "/system-logs/logins": {
+      "get": {
+        "operationId": "SystemLogsController_findLoginLogs",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "登录安全日志列表",
+        "tags": [
+          "后台接口/系统日志"
+        ]
+      }
+    },
+    "/upload-records": {
+      "get": {
+        "operationId": "UploadRecordsController_findAll",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "上传记录列表",
+        "tags": [
+          "后台接口/文件记录"
+        ]
+      }
+    },
+    "/medicine/catalog": {
+      "get": {
+        "operationId": "MedicineController_findCatalog",
+        "parameters": [
+          {
+            "name": "keyword",
+            "required": false,
+            "in": "query",
+            "description": "搜索关键字，匹配名称、别名或适应症",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "App 查询药品目录",
+        "tags": [
+          "家庭医生/药品目录"
+        ]
+      }
+    },
+    "/medicine/catalog/{id}": {
+      "get": {
+        "operationId": "MedicineController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "App 查询药品详情",
+        "tags": [
+          "家庭医生/药品目录"
+        ]
+      }
+    },
+    "/medicine/recognize-images": {
+      "post": {
+        "operationId": "MedicineController_recognizeImages",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "App 识别药盒图片并提取药品信息",
+        "tags": [
+          "家庭医生/药品目录"
+        ]
+      }
+    },
+    "/admin/medicine": {
+      "get": {
+        "operationId": "MedicineController_findAdminCatalog",
+        "parameters": [
+          {
+            "name": "keyword",
+            "required": false,
+            "in": "query",
+            "description": "搜索关键字，匹配名称、别名或适应症",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "后台查询药品目录",
+        "tags": [
+          "家庭医生/药品目录"
+        ]
+      },
+      "post": {
+        "operationId": "MedicineController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertMedicineDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "后台新增药品",
+        "tags": [
+          "家庭医生/药品目录"
+        ]
+      }
+    },
+    "/admin/medicine/{id}": {
+      "patch": {
+        "operationId": "MedicineController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertMedicineDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "后台更新药品",
+        "tags": [
+          "家庭医生/药品目录"
+        ]
+      },
+      "delete": {
+        "operationId": "MedicineController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "后台删除药品",
+        "tags": [
+          "家庭医生/药品目录"
+        ]
+      }
+    },
+    "/medicine/cabinet": {
+      "get": {
+        "operationId": "CabinetController_findCabinet",
+        "parameters": [
+          {
+            "name": "keyword",
+            "required": false,
+            "in": "query",
+            "description": "搜索关键字，匹配名称、别名或适应症",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "App 查询当前家庭药箱",
+        "tags": [
+          "家庭医生/家庭药箱"
+        ]
+      },
+      "post": {
+        "operationId": "CabinetController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCabinetInventoryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "App 新增当前家庭药箱库存",
+        "tags": [
+          "家庭医生/家庭药箱"
+        ]
+      }
+    },
+    "/medicine/cabinet/{inventoryId}": {
+      "patch": {
+        "operationId": "CabinetController_update",
+        "parameters": [
+          {
+            "name": "inventoryId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCabinetInventoryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "App 更新当前家庭药箱库存",
+        "tags": [
+          "家庭医生/家庭药箱"
+        ]
+      },
+      "delete": {
+        "operationId": "CabinetController_remove",
+        "parameters": [
+          {
+            "name": "inventoryId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "App 删除当前家庭药箱库存",
+        "tags": [
+          "家庭医生/家庭药箱"
+        ]
+      }
+    },
+    "/admin/household-medicines": {
+      "get": {
+        "operationId": "CabinetController_findAdminCabinet",
+        "parameters": [
+          {
+            "name": "householdId",
+            "required": false,
+            "in": "query",
+            "description": "家庭 ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "description": "App 用户 ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "keyword",
+            "required": false,
+            "in": "query",
+            "description": "家庭、药品或适应症关键字",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "expireStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "expired",
+                "expiring",
+                "valid",
+                "unknown"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "后台查询家庭药箱库存",
+        "tags": [
+          "家庭医生/家庭药箱"
+        ]
+      }
+    },
+    "/admin/household-medicines/{inventoryId}": {
+      "delete": {
+        "operationId": "CabinetController_removeAdmin",
+        "parameters": [
+          {
+            "name": "inventoryId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "后台删除家庭药箱库存",
+        "tags": [
+          "家庭医生/家庭药箱"
+        ]
+      }
+    },
+    "/consultation/asr/transcribe": {
+      "post": {
+        "operationId": "VoiceController_transcribeAudio",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "App 上传录音并识别为文字",
+        "tags": [
+          "家庭医生/语音"
+        ]
+      }
+    },
+    "/consultation/ask": {
+      "post": {
+        "operationId": "ConsultationController_ask",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskConsultationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "App 发起一次问诊",
+        "tags": [
+          "家庭医生/问诊"
+        ]
+      }
+    },
+    "/consultation/ask/stream": {
+      "post": {
+        "operationId": "ConsultationController_askStream",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskConsultationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "App 流式发起一次问诊",
+        "tags": [
+          "家庭医生/问诊"
+        ]
+      }
+    },
+    "/consultation/sessions": {
+      "get": {
+        "operationId": "ConsultationController_findUserSessions",
+        "parameters": [
+          {
+            "name": "keyword",
+            "required": false,
+            "in": "query",
+            "description": "标题或会话 ID 关键字",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "householdId",
+            "required": false,
+            "in": "query",
+            "description": "家庭 ID，仅后台筛选使用",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "description": "App 用户 ID，仅后台筛选使用",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "App 查询当前用户问诊历史",
+        "tags": [
+          "家庭医生/问诊"
+        ]
+      }
+    },
+    "/consultation/sessions/{id}": {
+      "get": {
+        "operationId": "ConsultationController_findUserSession",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "App 查看当前用户问诊详情",
+        "tags": [
+          "家庭医生/问诊"
+        ]
+      }
+    },
+    "/admin/consultations": {
+      "get": {
+        "operationId": "ConsultationController_findSessions",
+        "parameters": [
+          {
+            "name": "keyword",
+            "required": false,
+            "in": "query",
+            "description": "标题或会话 ID 关键字",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "householdId",
+            "required": false,
+            "in": "query",
+            "description": "家庭 ID，仅后台筛选使用",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "description": "App 用户 ID，仅后台筛选使用",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "后台查询问诊会话列表",
+        "tags": [
+          "家庭医生/问诊"
+        ]
+      }
+    },
+    "/admin/consultations/{id}": {
+      "get": {
+        "operationId": "ConsultationController_findSession",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "后台查看问诊会话详情和 Agent Trace",
+        "tags": [
+          "家庭医生/问诊"
+        ]
+      },
+      "delete": {
+        "operationId": "ConsultationController_removeAdmin",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "后台删除问诊会话",
+        "tags": [
+          "家庭医生/问诊"
+        ]
+      }
+    },
+    "/admin/consultations-debug/prompts": {
+      "get": {
+        "operationId": "ConsultationController_findPromptCatalog",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "后台查看问诊 Agent Prompt 目录",
+        "tags": [
+          "家庭医生/问诊"
+        ]
+      }
+    },
+    "/cron-jobs": {
+      "get": {
+        "operationId": "RemindersController_findAppJobs",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "householdId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "enabled",
+                "disabled",
+                "expired"
+              ]
+            }
+          },
+          {
+            "name": "taskType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "medicine",
+                "temperature",
+                "cabinet"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "App 查询当前家庭定时任务",
+        "tags": [
+          "家庭医生/定时任务"
+        ]
+      }
+    },
+    "/cron-jobs/{jobId}/status": {
+      "patch": {
+        "operationId": "RemindersController_updateAppStatus",
+        "parameters": [
+          {
+            "name": "jobId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCronJobStatusDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "App 启用或停用定时任务",
+        "tags": [
+          "家庭医生/定时任务"
+        ]
+      }
+    },
+    "/cron-jobs/{jobId}": {
+      "delete": {
+        "operationId": "RemindersController_removeAppJob",
+        "parameters": [
+          {
+            "name": "jobId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "App 删除定时任务",
+        "tags": [
+          "家庭医生/定时任务"
+        ]
+      }
+    },
+    "/cron-jobs/{jobId}/executions": {
+      "get": {
+        "operationId": "RemindersController_findAppExecutions",
+        "parameters": [
+          {
+            "name": "jobId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "App 查询定时任务执行记录",
+        "tags": [
+          "家庭医生/定时任务"
+        ]
+      }
+    },
+    "/agent-data/cron-jobs": {
+      "post": {
+        "operationId": "RemindersController_createAgentJob",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCronJobDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Agent 内部创建定时任务数据",
+        "tags": [
+          "家庭医生/定时任务"
+        ]
+      },
+      "get": {
+        "operationId": "RemindersController_findAgentJobs",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "householdId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "enabled",
+                "disabled",
+                "expired"
+              ]
+            }
+          },
+          {
+            "name": "taskType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "medicine",
+                "temperature",
+                "cabinet"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Agent 内部查询定时任务数据",
+        "tags": [
+          "家庭医生/定时任务"
+        ]
+      }
+    },
+    "/agent-data/cron-jobs/due": {
+      "get": {
+        "operationId": "RemindersController_findDueAgentJobs",
+        "parameters": [
+          {
+            "name": "now",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Agent 内部查询到期定时任务",
+        "tags": [
+          "家庭医生/定时任务"
+        ]
+      }
+    },
+    "/agent-data/cron-jobs/{jobId}/status": {
+      "patch": {
+        "operationId": "RemindersController_updateAgentStatus",
+        "parameters": [
+          {
+            "name": "jobId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCronJobStatusDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Agent 内部更新定时任务状态",
+        "tags": [
+          "家庭医生/定时任务"
+        ]
+      }
+    },
+    "/agent-data/cron-jobs/{jobId}/schedule": {
+      "patch": {
+        "operationId": "RemindersController_updateAgentSchedule",
+        "parameters": [
+          {
+            "name": "jobId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCronJobScheduleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Agent 内部更新定时任务下次执行时间",
+        "tags": [
+          "家庭医生/定时任务"
+        ]
+      }
+    },
+    "/agent-data/cron-jobs/{jobId}": {
+      "delete": {
+        "operationId": "RemindersController_removeAgentJob",
+        "parameters": [
+          {
+            "name": "jobId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Agent 内部删除定时任务数据",
+        "tags": [
+          "家庭医生/定时任务"
+        ]
+      }
+    },
+    "/agent-data/cron-jobs/{jobId}/executions": {
+      "post": {
+        "operationId": "RemindersController_createAgentExecution",
+        "parameters": [
+          {
+            "name": "jobId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCronJobExecutionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Agent 内部写入定时任务执行记录",
+        "tags": [
+          "家庭医生/定时任务"
+        ]
+      }
+    },
+    "/agent-data/cabinet/expired": {
+      "get": {
+        "operationId": "RemindersController_findExpiredMedicines",
+        "parameters": [
+          {
+            "name": "householdId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Agent 内部查询过期药品",
+        "tags": [
+          "家庭医生/定时任务"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Family Doctor Platform API",
+    "description": "家庭药箱系统后台与 App BFF 接口文档",
+    "version": "1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
+    "schemas": {
+      "CreateUserDto": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "example": "admin",
+            "description": "用户名，用于登录和唯一标识"
+          },
+          "email": {
+            "type": "string",
+            "example": "user@example.com",
+            "description": "用户邮箱地址，可选"
+          },
+          "avatarUrl": {
+            "type": "object",
+            "example": "https://example.com/avatar.png",
+            "nullable": true,
+            "description": "用户头像地址，可选"
+          },
+          "password": {
+            "type": "string",
+            "example": "password123",
+            "description": "用户密码，最少6位字符"
+          },
+          "name": {
+            "type": "string",
+            "example": "管理员",
+            "description": "用户姓名，可选"
+          }
+        },
+        "required": [
+          "username",
+          "password"
+        ]
+      },
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "example": "admin",
+            "description": "用户名"
+          },
+          "password": {
+            "type": "string",
+            "description": "密码（前端使用 /auth/public-key 返回的 RSA 公钥加密后的 base64 字符串）",
+            "example": "kJx9aB2c... (RSA-PKCS1 cipher base64)"
+          }
+        },
+        "required": [
+          "username",
+          "password"
+        ]
+      },
+      "RefreshTokenDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "description": "刷新令牌"
+          }
+        },
+        "required": [
+          "refreshToken"
+        ]
+      },
+      "UpdateUserDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "user@example.com",
+            "description": "用户邮箱地址，可选"
+          },
+          "avatarUrl": {
+            "type": "object",
+            "example": "https://example.com/avatar.png",
+            "nullable": true,
+            "description": "用户头像地址，可选，传 null 可清空"
+          },
+          "password": {
+            "type": "string",
+            "example": "newpassword123",
+            "description": "用户新密码，最少6位字符，可选"
+          },
+          "name": {
+            "type": "string",
+            "example": "张三",
+            "description": "用户姓名，可选"
+          }
+        }
+      },
+      "ResetUserPasswordDto": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string",
+            "example": "newpassword123",
+            "description": "用户新密码，最少6位字符"
+          }
+        },
+        "required": [
+          "password"
+        ]
+      },
+      "BatchIdsDto": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "description": "批量操作 ID 列表",
+            "example": [
+              1,
+              2,
+              3
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "ids"
+        ]
+      },
+      "RegisterAppUserDto": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "description": "用户名",
+            "example": "alice"
+          },
+          "password": {
+            "type": "string",
+            "description": "密码",
+            "minLength": 6
+          },
+          "registrationCode": {
+            "type": "string",
+            "description": "系统注册码",
+            "example": "REG2026"
+          }
+        },
+        "required": [
+          "username",
+          "password",
+          "registrationCode"
+        ]
+      },
+      "LoginAppUserDto": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "description": "用户名",
+            "example": "alice"
+          },
+          "password": {
+            "type": "string",
+            "description": "密码"
+          }
+        },
+        "required": [
+          "username",
+          "password"
+        ]
+      },
+      "RefreshAppTokenDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "description": "App refresh token"
+          }
+        },
+        "required": [
+          "refreshToken"
+        ]
+      },
+      "UpdateAppProfileDto": {
+        "type": "object",
+        "properties": {
+          "avatarUrl": {
+            "type": "string",
+            "description": "头像 URL"
+          },
+          "age": {
+            "type": "number",
+            "description": "年龄",
+            "minimum": 0,
+            "maximum": 130
+          },
+          "gender": {
+            "type": "string",
+            "description": "性别",
+            "enum": [
+              "male",
+              "female",
+              "other",
+              "unknown"
+            ]
+          },
+          "allergies": {
+            "type": "string",
+            "description": "过敏史"
+          },
+          "chronicDiseases": {
+            "type": "string",
+            "description": "基础病"
+          },
+          "medicationHistory": {
+            "type": "string",
+            "description": "长期用药"
+          }
+        }
+      },
+      "UpdateAppUserStatusDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "App 用户状态",
+            "enum": [
+              "active",
+              "disabled"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "ResetAppUserPasswordDto": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string",
+            "example": "newpassword123",
+            "description": "App 用户新密码，最少6位字符"
+          }
+        },
+        "required": [
+          "password"
+        ]
+      },
+      "CreateHouseholdDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "家庭名称",
+            "example": "我的家庭"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "JoinHouseholdDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "家庭邀请码，6 位十六进制",
+            "example": "A3F91C"
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "UpdateHouseholdMemberDto": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "description": "成员角色",
+            "enum": [
+              "owner",
+              "member"
+            ]
+          },
+          "displayName": {
+            "type": "string",
+            "description": "成员在家庭内显示名",
+            "example": "妈妈"
+          }
+        }
+      },
+      "CreateDictionaryTypeDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "字典名称",
+            "example": "用户状态"
+          },
+          "code": {
+            "type": "string",
+            "description": "字典编码",
+            "example": "user_status"
+          },
+          "description": {
+            "type": "string",
+            "description": "字典说明"
+          },
+          "isEnabled": {
+            "type": "boolean",
+            "description": "是否启用",
+            "default": true
+          },
+          "sort": {
+            "type": "number",
+            "description": "排序号",
+            "default": 0
+          }
+        },
+        "required": [
+          "name",
+          "code"
+        ]
+      },
+      "DictionaryTypeVo": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number",
+            "description": "字典类型ID"
+          },
+          "name": {
+            "type": "string",
+            "description": "字典名称"
+          },
+          "code": {
+            "type": "string",
+            "description": "字典编码"
+          },
+          "description": {
+            "type": "object",
+            "description": "字典说明",
+            "nullable": true
+          },
+          "isEnabled": {
+            "type": "boolean",
+            "description": "是否启用"
+          },
+          "sort": {
+            "type": "number",
+            "description": "排序号"
+          },
+          "itemCount": {
+            "type": "number",
+            "description": "字典项数量"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "创建时间"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "更新时间"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "code",
+          "description",
+          "isEnabled",
+          "sort",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "UpdateDictionaryTypeDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "字典名称",
+            "example": "用户状态"
+          },
+          "code": {
+            "type": "string",
+            "description": "字典编码",
+            "example": "user_status"
+          },
+          "description": {
+            "type": "string",
+            "description": "字典说明"
+          },
+          "isEnabled": {
+            "type": "boolean",
+            "description": "是否启用",
+            "default": true
+          },
+          "sort": {
+            "type": "number",
+            "description": "排序号",
+            "default": 0
+          }
+        }
+      },
+      "DictionaryItemVo": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number",
+            "description": "字典项ID"
+          },
+          "typeId": {
+            "type": "number",
+            "description": "所属字典类型ID"
+          },
+          "label": {
+            "type": "string",
+            "description": "字典项标签"
+          },
+          "value": {
+            "type": "string",
+            "description": "字典项值"
+          },
+          "color": {
+            "type": "object",
+            "description": "展示颜色",
+            "nullable": true
+          },
+          "isEnabled": {
+            "type": "boolean",
+            "description": "是否启用"
+          },
+          "sort": {
+            "type": "number",
+            "description": "排序号"
+          },
+          "remark": {
+            "type": "object",
+            "description": "备注",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "创建时间"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "更新时间"
+          }
+        },
+        "required": [
+          "id",
+          "typeId",
+          "label",
+          "value",
+          "color",
+          "isEnabled",
+          "sort",
+          "remark",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CreateDictionaryItemDto": {
+        "type": "object",
+        "properties": {
+          "typeId": {
+            "type": "number",
+            "description": "所属字典类型ID",
+            "example": 1
+          },
+          "label": {
+            "type": "string",
+            "description": "字典项标签",
+            "example": "启用"
+          },
+          "value": {
+            "type": "string",
+            "description": "字典项值",
+            "example": "enabled"
+          },
+          "color": {
+            "type": "string",
+            "description": "展示颜色",
+            "example": "#18a058"
+          },
+          "isEnabled": {
+            "type": "boolean",
+            "description": "是否启用",
+            "default": true
+          },
+          "sort": {
+            "type": "number",
+            "description": "排序号",
+            "default": 0
+          },
+          "remark": {
+            "type": "string",
+            "description": "备注"
+          }
+        },
+        "required": [
+          "typeId",
+          "label",
+          "value"
+        ]
+      },
+      "UpdateDictionaryItemDto": {
+        "type": "object",
+        "properties": {
+          "typeId": {
+            "type": "number",
+            "description": "所属字典类型ID",
+            "example": 1
+          },
+          "label": {
+            "type": "string",
+            "description": "字典项标签",
+            "example": "启用"
+          },
+          "value": {
+            "type": "string",
+            "description": "字典项值",
+            "example": "enabled"
+          },
+          "color": {
+            "type": "string",
+            "description": "展示颜色",
+            "example": "#18a058"
+          },
+          "isEnabled": {
+            "type": "boolean",
+            "description": "是否启用",
+            "default": true
+          },
+          "sort": {
+            "type": "number",
+            "description": "排序号",
+            "default": 0
+          },
+          "remark": {
+            "type": "string",
+            "description": "备注"
+          }
+        }
+      },
+      "CreateRoleDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "管理员",
+            "description": "角色名称，用于显示"
+          },
+          "code": {
+            "type": "string",
+            "example": "admin",
+            "description": "角色编码，唯一标识符，用于权限判断"
+          },
+          "description": {
+            "type": "string",
+            "example": "超级管理员",
+            "description": "角色描述，说明角色的职责和权限范围"
+          },
+          "menuIds": {
+            "example": [
+              1,
+              2,
+              3
+            ],
+            "description": "关联的菜单ID数组，定义该角色可以访问的菜单",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "code"
+        ]
+      },
+      "UpdateRoleDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "管理员",
+            "description": "角色名称，用于显示"
+          },
+          "code": {
+            "type": "string",
+            "example": "admin",
+            "description": "角色编码，唯一标识符，用于权限判断"
+          },
+          "description": {
+            "type": "string",
+            "example": "超级管理员",
+            "description": "角色描述，说明角色的职责和权限范围"
+          },
+          "menuIds": {
+            "example": [
+              1,
+              2,
+              3
+            ],
+            "description": "关联的菜单ID数组，定义该角色可以访问的菜单",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "CreateMenuDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "系统管理",
+            "description": "菜单名称，用于显示在侧边栏或面包屑中"
+          },
+          "path": {
+            "type": "string",
+            "example": "/system",
+            "description": "路由路径，对应前端vue文件的path"
+          },
+          "icon": {
+            "type": "string",
+            "example": "setting",
+            "description": "菜单图标，对应Element Plus或IconPark图标名称"
+          },
+          "component": {
+            "type": "string",
+            "example": "layout/System/index",
+            "description": "前端组件路径，相对于views或pages目录的路径"
+          },
+          "redirect": {
+            "type": "string",
+            "example": "",
+            "description": "重定向地址，当访问该菜单时自动跳转到指定地址"
+          },
+          "permission": {
+            "type": "string",
+            "example": "system:user:view",
+            "description": "权限标识，用于后端接口和前端按钮权限判断"
+          },
+          "parentId": {
+            "type": "number",
+            "example": 1,
+            "description": "父级菜单ID，指定该菜单的上级菜单，创建子菜单时使用"
+          },
+          "order": {
+            "type": "number",
+            "example": 1,
+            "description": "排序号，数字越小越靠前显示，用于菜单排序"
+          },
+          "hidden": {
+            "type": "boolean",
+            "example": false,
+            "description": "是否隐藏该菜单，不在侧边栏显示但仍可访问"
+          },
+          "type": {
+            "type": "string",
+            "example": "menu",
+            "enum": [
+              "menu",
+              "button",
+              "iframe"
+            ],
+            "description": "菜单类型：menu-菜单、button-按钮、iframe-外链"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "UpdateMenuDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "系统管理",
+            "description": "菜单名称，用于显示在侧边栏或面包屑中"
+          },
+          "path": {
+            "type": "string",
+            "example": "/system",
+            "description": "路由路径，对应前端vue文件的path"
+          },
+          "icon": {
+            "type": "string",
+            "example": "setting",
+            "description": "菜单图标，对应Element Plus或IconPark图标名称"
+          },
+          "component": {
+            "type": "string",
+            "example": "layout/System/index",
+            "description": "前端组件路径，相对于views或pages目录的路径"
+          },
+          "redirect": {
+            "type": "string",
+            "example": "",
+            "description": "重定向地址，当访问该菜单时自动跳转到指定地址"
+          },
+          "permission": {
+            "type": "string",
+            "example": "system:user:view",
+            "description": "权限标识，用于后端接口和前端按钮权限判断"
+          },
+          "parentId": {
+            "type": "number",
+            "example": 1,
+            "description": "父级菜单ID，指定该菜单的上级菜单，创建子菜单时使用"
+          },
+          "order": {
+            "type": "number",
+            "example": 1,
+            "description": "排序号，数字越小越靠前显示，用于菜单排序"
+          },
+          "hidden": {
+            "type": "boolean",
+            "example": false,
+            "description": "是否隐藏该菜单，不在侧边栏显示但仍可访问"
+          },
+          "type": {
+            "type": "string",
+            "example": "menu",
+            "enum": [
+              "menu",
+              "button",
+              "iframe"
+            ],
+            "description": "菜单类型：menu-菜单、button-按钮、iframe-外链"
+          }
+        }
+      },
+      "SystemSettingVo": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number",
+            "description": "配置ID"
+          },
+          "key": {
+            "type": "string",
+            "description": "配置键"
+          },
+          "category": {
+            "type": "string",
+            "description": "配置分类"
+          },
+          "name": {
+            "type": "string",
+            "description": "配置名称"
+          },
+          "value": {
+            "type": "object",
+            "description": "配置内容"
+          },
+          "description": {
+            "type": "object",
+            "description": "配置说明",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "创建时间"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "更新时间"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "category",
+          "name",
+          "value",
+          "description",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "UpsertSystemSettingDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "配置键",
+            "example": "mini-program.auth"
+          },
+          "category": {
+            "type": "string",
+            "description": "配置分类",
+            "example": "mini-program"
+          },
+          "name": {
+            "type": "string",
+            "description": "配置名称",
+            "example": "小程序认证配置"
+          },
+          "value": {
+            "type": "object",
+            "description": "配置内容",
+            "example": {
+              "wechatAppId": "wx1234567890",
+              "wechatAppSecret": "secret"
+            }
+          },
+          "description": {
+            "type": "string",
+            "description": "配置说明"
+          }
+        },
+        "required": [
+          "key",
+          "category",
+          "name",
+          "value"
+        ]
+      },
+      "UpsertMedicineDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "药品名称"
+          },
+          "aliases": {
+            "description": "别名/通用名/商品名",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "otc": {
+            "type": "string",
+            "enum": [
+              "OTC",
+              "RX"
+            ],
+            "description": "分类：OTC(非处方药) 或 RX(处方药)"
+          },
+          "indication": {
+            "type": "string",
+            "description": "适应症"
+          },
+          "contraindication": {
+            "type": "string",
+            "description": "禁忌人群"
+          },
+          "adverseReaction": {
+            "type": "string",
+            "description": "不良反应"
+          },
+          "dosage": {
+            "type": "string",
+            "description": "用法用量"
+          },
+          "barcode": {
+            "type": "string",
+            "description": "条形码"
+          },
+          "approvalNumber": {
+            "type": "string",
+            "description": "批准文号"
+          }
+        },
+        "required": [
+          "name",
+          "otc",
+          "indication"
+        ]
+      },
+      "CreateCabinetInventoryDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "药品名称"
+          },
+          "aliases": {
+            "description": "别名/通用名/商品名",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "otc": {
+            "type": "string",
+            "enum": [
+              "OTC",
+              "RX"
+            ],
+            "description": "分类：OTC(非处方药) 或 RX(处方药)"
+          },
+          "indication": {
+            "type": "string",
+            "description": "适应症"
+          },
+          "contraindication": {
+            "type": "string",
+            "description": "禁忌人群"
+          },
+          "adverseReaction": {
+            "type": "string",
+            "description": "不良反应"
+          },
+          "dosage": {
+            "type": "string",
+            "description": "用法用量"
+          },
+          "barcode": {
+            "type": "string",
+            "description": "条形码"
+          },
+          "approvalNumber": {
+            "type": "string",
+            "description": "批准文号"
+          },
+          "quantity": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1,
+            "maximum": 999
+          },
+          "expireAt": {
+            "type": "string",
+            "description": "有效期，YYYY-MM-DD"
+          },
+          "source": {
+            "type": "string",
+            "description": "来源：manual/image/barcode/admin"
+          },
+          "notes": {
+            "type": "string",
+            "description": "备注"
+          }
+        },
+        "required": [
+          "name",
+          "otc",
+          "indication"
+        ]
+      },
+      "UpdateCabinetInventoryDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "药品名称"
+          },
+          "aliases": {
+            "description": "别名/通用名/商品名",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "otc": {
+            "type": "string",
+            "enum": [
+              "OTC",
+              "RX"
+            ],
+            "description": "分类：OTC(非处方药) 或 RX(处方药)"
+          },
+          "indication": {
+            "type": "string",
+            "description": "适应症"
+          },
+          "contraindication": {
+            "type": "string",
+            "description": "禁忌人群"
+          },
+          "adverseReaction": {
+            "type": "string",
+            "description": "不良反应"
+          },
+          "dosage": {
+            "type": "string",
+            "description": "用法用量"
+          },
+          "barcode": {
+            "type": "string",
+            "description": "条形码"
+          },
+          "approvalNumber": {
+            "type": "string",
+            "description": "批准文号"
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 999
+          },
+          "expireAt": {
+            "type": "string",
+            "description": "有效期，YYYY-MM-DD"
+          },
+          "source": {
+            "type": "string",
+            "description": "来源"
+          },
+          "notes": {
+            "type": "string",
+            "description": "备注"
+          }
+        }
+      },
+      "AskConsultationAudioDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "是否返回语音播报事件"
+          },
+          "codec": {
+            "type": "string",
+            "description": "音频编码",
+            "enum": [
+              "mp3",
+              "wav"
+            ]
+          }
+        }
+      },
+      "AskConsultationDto": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "description": "已有会话 ID；为空时后端创建新会话"
+          },
+          "question": {
+            "type": "string",
+            "description": "用户症状描述"
+          },
+          "allowRxRecommendation": {
+            "type": "boolean",
+            "description": "是否允许 Agent 推荐 RX 处方药，默认 false"
+          },
+          "audio": {
+            "description": "语音播报配置",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AskConsultationAudioDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "question"
+        ]
+      },
+      "UpdateCronJobStatusDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "enabled",
+              "disabled",
+              "expired"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "CreateCronJobDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string"
+          },
+          "householdId": {
+            "type": "string"
+          },
+          "memberId": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "cron",
+              "every",
+              "at"
+            ]
+          },
+          "taskType": {
+            "type": "string",
+            "enum": [
+              "medicine",
+              "temperature",
+              "cabinet"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "enabled",
+              "disabled",
+              "expired"
+            ]
+          },
+          "cronExpression": {
+            "type": "string"
+          },
+          "everySeconds": {
+            "type": "number"
+          },
+          "runAt": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "payload": {
+            "type": "object"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "user_agent",
+              "system"
+            ]
+          },
+          "idempotencyKey": {
+            "type": "string"
+          },
+          "nextRunAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "householdId",
+          "type",
+          "taskType",
+          "title"
+        ]
+      },
+      "UpdateCronJobScheduleDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "enabled",
+              "disabled",
+              "expired"
+            ]
+          },
+          "nextRunAt": {
+            "type": "object"
+          }
+        }
+      },
+      "CreateCronJobExecutionDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failed",
+              "skipped"
+            ]
+          },
+          "startedAt": {
+            "type": "string"
+          },
+          "finishedAt": {
+            "type": "string"
+          },
+          "result": {
+            "type": "object"
+          },
+          "errorMessage": {
+            "type": "string"
+          },
+          "dedupeKey": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      }
+    }
+  }
+}

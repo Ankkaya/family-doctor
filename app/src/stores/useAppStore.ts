@@ -10,7 +10,9 @@ import type {
   AskConsultationStreamEvent,
   CabinetMedicineInput,
   RecognizedMedicineResult,
+  SpeechTranscriptionResult,
 } from "@/shared/api/app-api";
+import { enqueueBase64Audio, resetAudioQueue } from "@/shared/lib/audio-player";
 import { appStore } from "@/shared/storage/app-store";
 import { showErrorToast } from "@/shared/toast/toast-store";
 import {
@@ -72,6 +74,7 @@ type AppState = {
   familyLoading: boolean;
   familyError?: string;
   chatLoading: boolean;
+  voiceTranscribing: boolean;
   chatError?: string;
   medicinesLoading: boolean;
   recognitionLoading: boolean;
@@ -101,6 +104,7 @@ type AppState = {
   setAllowRxRecommendation: (value: boolean) => Promise<void>;
   loadMedicines: () => Promise<void>;
   recognizeMedicineImages: (files: File[]) => Promise<RecognizedMedicineResult>;
+  transcribeChatAudio: (file: File) => Promise<SpeechTranscriptionResult>;
   clearRecognizedMedicine: () => void;
   loadHistory: () => Promise<void>;
   loadReminders: () => Promise<void>;
@@ -223,6 +227,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   authLoading: false,
   familyLoading: false,
   chatLoading: false,
+  voiceTranscribing: false,
   medicinesLoading: false,
   recognitionLoading: false,
   historyLoading: false,
@@ -533,6 +538,20 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ recognitionLoading: false });
     }
   },
+  transcribeChatAudio: async (file) => {
+    if (get().voiceTranscribing) {
+      throw new Error("正在识别上一段录音，请稍候");
+    }
+
+    set({ voiceTranscribing: true, chatError: undefined });
+    try {
+      const result = await appApi.transcribeAudio(file);
+      set({ chatInput: result.text, activeTab: "chat", currentScreen: "chat" });
+      return result;
+    } finally {
+      set({ voiceTranscribing: false });
+    }
+  },
   clearRecognizedMedicine: () => set({
     recognizedMedicine: null,
     recognitionError: undefined,
@@ -657,6 +676,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       chatLoading: true,
       chatError: undefined,
     });
+    resetAudioQueue();
 
     try {
       let resolvedSessionId = get().activeSessionId;
@@ -666,6 +686,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         sessionId: get().activeSessionId,
         question: input,
         allowRxRecommendation: get().allowRxRecommendation,
+        audio: {
+          enabled: true,
+          codec: "mp3",
+        },
       }, (event: AskConsultationStreamEvent) => {
         if (event.type === "session") {
           resolvedSessionId = event.sessionId;
@@ -712,6 +736,15 @@ export const useAppStore = create<AppState>((set, get) => ({
               timestamp: formatCurrentTime(),
             })),
           });
+          return;
+        }
+
+        if (event.type === "audio_chunk") {
+          enqueueBase64Audio(event.audioBase64, event.codec);
+          return;
+        }
+
+        if (event.type === "audio_meta" || event.type === "audio_done" || event.type === "audio_error") {
           return;
         }
 

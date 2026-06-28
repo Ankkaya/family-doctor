@@ -197,6 +197,10 @@ export type AskConsultationInput = {
   sessionId?: string;
   question: string;
   allowRxRecommendation?: boolean;
+  audio?: {
+    enabled?: boolean;
+    codec?: "mp3" | "wav";
+  };
 };
 
 export type ConsultationRecommend = {
@@ -240,9 +244,34 @@ export type AskConsultationStreamEvent =
       disclaimer: string;
     }
   | {
+      type: "audio_meta";
+      codec: "mp3" | "wav";
+      sampleRate: number;
+    }
+  | {
+      type: "audio_chunk";
+      seq: number;
+      text: string;
+      audioBase64: string;
+      codec: "mp3" | "wav";
+    }
+  | {
+      type: "audio_done";
+    }
+  | {
+      type: "audio_error";
+      message: string;
+    }
+  | {
       type: "error";
       message: string;
     };
+
+export type SpeechTranscriptionResult = {
+  text: string;
+  provider: "tencent";
+  durationMs?: number;
+};
 
 export type RecognizedMedicineResult = Medicine & {
   confidence?: number;
@@ -667,6 +696,12 @@ export const appApi = {
     onEvent: (event: AskConsultationStreamEvent) => void | Promise<void>,
   ) {
     return httpClient.postJsonStream<AskConsultationStreamEvent>("/consultation/ask/stream", input, onEvent);
+  },
+
+  async transcribeAudio(file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+    return httpClient.postForm<SpeechTranscriptionResult>("/consultation/asr/transcribe", formData);
   },
 
   async recognizeMedicineImages(files: File[]) {
