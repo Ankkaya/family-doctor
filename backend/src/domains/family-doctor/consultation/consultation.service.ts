@@ -1,9 +1,16 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { Prisma } from '@prisma/client';
+import { EventType } from '@ag-ui/core';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 import { AgentClientService } from '../agent-client/agent-client.service';
-import { AgentTraceStep, AgentUserProfile, AgentRecommend } from '../agent-client/agent-client.types';
+import {
+  AgentAgUiEvent,
+  AgentAgUiRunInput,
+  AgentTraceStep,
+  AgentUserProfile,
+  AgentRecommend,
+} from '../agent-client/agent-client.types';
 import { CabinetService } from '../cabinet/cabinet.service';
 import { CurrentHousehold, HouseholdsService } from '@/domains/households/households.service';
 import { TencentTtsService } from '../voice/tencent-tts.service';
@@ -143,7 +150,7 @@ export type ConsultationStreamEvent =
   | {
       type: 'audio_error';
       message: string;
-    };
+  };
 
 function normalizeStreamStage(stage?: string): ConsultationStreamStage {
   if (stage === 'prepare' || stage === 'lookup' || stage === 'agent' || stage === 'fallback' || stage === 'finalize') {
@@ -308,6 +315,108 @@ export class ConsultationService {
 
     if (audioStreamer) {
       await audioStreamer.finish();
+    }
+  }
+
+  async askAgUiStream(
+    input: AgentAgUiRunInput,
+    current: CurrentHousehold,
+    onEvent: (event: AgentAgUiEvent) => Promise<void> | void,
+  ) {
+    const runId: string = input.runId?.trim() || randomUUID();
+    const dto = this.toAskConsultationDto(input);
+    const question = dto.question.trim();
+    const sessionId = dto.sessionId?.trim() || input.threadId?.trim() || randomUUID();
+    const assistantMessageId = randomUUID();
+    const title = this.buildSessionTitle(question);
+    const audioStreamer = dto.audio?.enabled === true
+      ? this.createAgUiAudioStreamer(dto.audio?.codec || 'mp3', onEvent)
+      : null;
+
+    if (dto.sessionId?.trim()) {
+      await this.assertSessionAccess(sessionId, current);
+    }
+
+    try {
+      await this.ensureSession(sessionId, title, current);
+      await this.createMessage({
+        id: randomUUID(),
+        sessionId,
+        role: 'USER',
+        content: question,
+        recommends: null,
+      });
+
+      const [medicines, userProfile, members, history] = await Promise.all([
+        this.cabinetService.findAgentBriefsByHousehold(current.householdId, question),
+        this.findAgentUserProfile(current.appUserId),
+        this.findAgentMembers(current.householdId),
+        this.findRecentMessagesForAgent(sessionId),
+      ]);
+
+      const agentResponse = await this.agentClient.agUiStream(
+        {
+          ...input,
+          threadId: sessionId,
+          runId,
+          state: {
+            ...(typeof input.state === 'object' && input.state ? input.state : {}),
+            sessionId,
+            messageId: assistantMessageId,
+            allowRxRecommendation: dto.allowRxRecommendation === true,
+          },
+          messages: input.messages ?? [],
+          tools: input.tools ?? [],
+          context: input.context ?? [],
+          forwardedProps: {
+            ...(typeof input.forwardedProps === 'object' && input.forwardedProps ? input.forwardedProps : {}),
+            sessionId,
+            messageId: assistantMessageId,
+            question,
+            userId: current.appUserId,
+            householdId: current.householdId,
+            medicines,
+            members,
+            history,
+            userProfile,
+            allowRxRecommendation: dto.allowRxRecommendation === true,
+            timezone: 'Asia/Shanghai',
+            now: new Date().toISOString(),
+          },
+        },
+        async (event) => {
+          await onEvent(event);
+          if (event.type === 'TEXT_MESSAGE_CONTENT') {
+            audioStreamer?.push(event.delta);
+          }
+        },
+      );
+
+      await this.createMessage({
+        id: assistantMessageId,
+        sessionId,
+        role: 'ASSISTANT',
+        content: agentResponse.answer,
+        recommends: agentResponse.recommends,
+      });
+      await this.createTraces(sessionId, agentResponse.traces ?? []);
+
+      if (audioStreamer) {
+        await audioStreamer.finish();
+      }
+    } catch (error) {
+      await onEvent({
+        type: EventType.RUN_ERROR,
+        message: error instanceof Error ? error.message : '问诊服务暂不可用',
+        code: 'CONSULTATION_ERROR',
+      });
+      if (audioStreamer) {
+        try {
+          await audioStreamer.finish();
+        } catch {
+          // Ignore secondary audio cleanup failures after the run has already failed.
+        }
+      }
     }
   }
 
@@ -652,6 +761,81 @@ export class ConsultationService {
     return title.length > 24 ? `${title.slice(0, 24)}...` : title;
   }
 
+  private toAskConsultationDto(input: AgentAgUiRunInput): AskConsultationDto {
+    const question = this.extractLatestUserText(input.messages)
+      || this.pickString(input.forwardedProps?.question)
+      || this.pickString(input.state?.question);
+
+    if (!question || question.trim().length < 2) {
+      throw new BadRequestException('AG-UI 输入缺少有效用户问题');
+    }
+
+    const sessionId = this.pickString(input.forwardedProps?.sessionId)
+      || this.pickString(input.state?.sessionId);
+    const allowRxRecommendation = this.pickBoolean(input.forwardedProps?.allowRxRecommendation)
+      ?? this.pickBoolean(input.state?.allowRxRecommendation);
+    const audio = this.pickAudioConfig(input.forwardedProps?.audio)
+      ?? this.pickAudioConfig(input.state?.audio);
+
+    return {
+      sessionId,
+      question,
+      allowRxRecommendation,
+      audio,
+    };
+  }
+
+  private extractLatestUserText(messages?: Array<Record<string, unknown>>) {
+    const message = [...(messages ?? [])]
+      .reverse()
+      .find((item) => item.role === 'user');
+
+    return this.extractMessageText(message?.content);
+  }
+
+  private extractMessageText(content: unknown): string | undefined {
+    if (typeof content === 'string') {
+      return content.trim() || undefined;
+    }
+
+    if (!Array.isArray(content)) {
+      return undefined;
+    }
+
+    const text = content
+      .map((part) => {
+        if (typeof part === 'string') return part;
+        if (!part || typeof part !== 'object') return '';
+
+        const maybeText = (part as { text?: unknown }).text;
+        return typeof maybeText === 'string' ? maybeText : '';
+      })
+      .join('')
+      .trim();
+
+    return text || undefined;
+  }
+
+  private pickString(value: unknown) {
+    return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+  }
+
+  private pickBoolean(value: unknown) {
+    return typeof value === 'boolean' ? value : undefined;
+  }
+
+  private pickAudioConfig(value: unknown): AskConsultationDto['audio'] | undefined {
+    if (!value || typeof value !== 'object') {
+      return undefined;
+    }
+
+    const input = value as { enabled?: unknown; codec?: unknown };
+    return {
+      enabled: input.enabled === true,
+      codec: input.codec === 'wav' ? 'wav' : 'mp3',
+    };
+  }
+
   private normalizeOptionalProfileText(value?: string | null) {
     const normalized = value?.trim();
     if (!normalized) return null;
@@ -722,6 +906,79 @@ export class ConsultationService {
         await chain;
         if (!failed && metadataSent) {
           await onEvent({ type: 'audio_done' });
+        }
+      },
+    };
+  }
+
+  private createAgUiAudioStreamer(
+    codec: 'mp3' | 'wav',
+    onEvent: (event: AgentAgUiEvent) => Promise<void> | void,
+  ) {
+    let pendingText = '';
+    let sequence = 0;
+    let metadataSent = false;
+    let chain = Promise.resolve();
+    let failed = false;
+
+    const emitCustom = (name: string, value: Record<string, unknown>) => onEvent({
+      type: EventType.CUSTOM,
+      name,
+      value,
+    });
+
+    const enqueue = (text: string) => {
+      const normalized = text.replace(/\s+/g, ' ').trim();
+      if (!normalized || failed) return;
+
+      chain = chain.then(async () => {
+        try {
+          const audio = await this.ttsService.synthesize({ text: normalized, codec });
+          if (!audio.audioBase64) return;
+
+          if (!metadataSent) {
+            metadataSent = true;
+            await emitCustom('consultation.audio_meta', {
+              type: 'audio_meta',
+              codec: audio.codec,
+              sampleRate: audio.sampleRate,
+            });
+          }
+
+          sequence += 1;
+          await emitCustom('consultation.audio_chunk', {
+            type: 'audio_chunk',
+            seq: sequence,
+            text: normalized,
+            audioBase64: audio.audioBase64,
+            codec: audio.codec,
+          });
+        } catch (error) {
+          failed = true;
+          await emitCustom('consultation.audio_error', {
+            type: 'audio_error',
+            message: error instanceof Error ? error.message : '语音合成失败',
+          });
+        }
+      });
+    };
+
+    return {
+      push: (delta: string) => {
+        pendingText += delta;
+        const { ready, rest } = this.extractSpeakableSentences(pendingText);
+        pendingText = rest;
+        ready.forEach(enqueue);
+      },
+      finish: async () => {
+        const rest = pendingText.trim();
+        pendingText = '';
+        if (rest) {
+          enqueue(rest);
+        }
+        await chain;
+        if (!failed && metadataSent) {
+          await emitCustom('consultation.audio_done', { type: 'audio_done' });
         }
       },
     };

@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { AGUIEvent, RunAgentInput } from "@ag-ui/core";
 import { httpClient } from "@/shared/api/http-client";
 import { isTauri } from "@/shared/lib/platform";
 import { appStore } from "@/shared/storage/app-store";
@@ -266,6 +267,10 @@ export type AskConsultationStreamEvent =
       type: "error";
       message: string;
     };
+
+export type AgUiRunAgentInput = RunAgentInput;
+
+export type AgUiEvent = AGUIEvent;
 
 export type SpeechTranscriptionResult = {
   text: string;
@@ -696,6 +701,13 @@ export const appApi = {
     onEvent: (event: AskConsultationStreamEvent) => void | Promise<void>,
   ) {
     return httpClient.postJsonStream<AskConsultationStreamEvent>("/consultation/ask/stream", input, onEvent);
+  },
+
+  async askAgUiStream(
+    input: AgUiRunAgentInput,
+    onEvent: (event: AgUiEvent) => void | Promise<void>,
+  ) {
+    return httpClient.runAgUiAgent(input, onEvent);
   },
 
   async transcribeAudio(file: File) {

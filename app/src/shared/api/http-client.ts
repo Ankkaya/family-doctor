@@ -1,4 +1,7 @@
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
+import { HttpAgent } from "@ag-ui/client";
+import type { AgentSubscriber } from "@ag-ui/client";
+import type { AGUIEvent, Message, RunAgentInput } from "@ag-ui/core";
 import {
   createApiErrorFromResponse,
   parseJsonResponse,
@@ -107,6 +110,17 @@ async function requestJson<T>(input: string | URL, init: HttpRequestInit) {
   }
 }
 
+function parseSseEvent<T>(rawEvent: string): T | undefined {
+  const data = rawEvent
+    .split(/\r?\n/)
+    .filter((line) => line.startsWith("data:"))
+    .map((line) => line.slice(5).trimStart())
+    .join("\n")
+    .trim();
+
+  return data ? JSON.parse(data) as T : undefined;
+}
+
 export const httpClient = {
   setAuthHeadersProvider(provider: AuthHeadersProvider) {
     authHeadersProvider = provider;
@@ -209,6 +223,103 @@ export const httpClient = {
       if (buffer.trim()) {
         await onEvent(JSON.parse(buffer.trim()) as T);
       }
+    } catch (error) {
+      const apiError = toApiError(error);
+      if (!init?.suppressErrorToast) {
+        showErrorToast(apiError.message);
+      }
+      throw apiError;
+    }
+  },
+
+  async postJsonEventStream<T>(
+    input: string | URL,
+    body: unknown,
+    onEvent: (event: T) => void | Promise<void>,
+    init?: HttpRequestInit,
+  ) {
+    try {
+      const response = await requestStream(input, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "text/event-stream",
+          ...(init?.headers ?? {}),
+        },
+        body: body ? JSON.stringify(body) : undefined,
+        ...init,
+      });
+
+      if (!response.ok) {
+        throw await createApiErrorFromResponse(response);
+      }
+
+      if (!response.body) {
+        throw new Error("当前环境不支持流式响应");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
+
+        const events = buffer.split(/\r?\n\r?\n/);
+        buffer = events.pop() ?? "";
+
+        for (const rawEvent of events) {
+          const event = parseSseEvent<T>(rawEvent);
+          if (event) {
+            await onEvent(event);
+          }
+        }
+
+        if (done) {
+          break;
+        }
+      }
+
+      const finalEvent = parseSseEvent<T>(buffer.trim());
+      if (finalEvent) {
+        await onEvent(finalEvent);
+      }
+    } catch (error) {
+      const apiError = toApiError(error);
+      if (!init?.suppressErrorToast) {
+        showErrorToast(apiError.message);
+      }
+      throw apiError;
+    }
+  },
+
+  async runAgUiAgent(
+    input: RunAgentInput,
+    onEvent: (event: AGUIEvent) => void | Promise<void>,
+    init?: HttpRequestInit,
+  ) {
+    const agent = new HttpAgent({
+      url: String(resolveUrl("/consultation/ag-ui")),
+      threadId: input.threadId,
+      initialMessages: input.messages as Message[],
+      initialState: input.state,
+      fetch: (url, requestInit) => requestStream(url, {
+        ...requestInit,
+        suppressErrorToast: init?.suppressErrorToast,
+      } as HttpRequestInit),
+    });
+    const subscriber: AgentSubscriber = {
+      onEvent: ({ event }) => onEvent(event as AGUIEvent),
+    };
+
+    try {
+      await agent.runAgent({
+        runId: input.runId,
+        tools: input.tools,
+        context: input.context,
+        forwardedProps: input.forwardedProps,
+      }, subscriber);
     } catch (error) {
       const apiError = toApiError(error);
       if (!init?.suppressErrorToast) {

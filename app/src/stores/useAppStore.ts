@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { EventType } from "@ag-ui/core";
 import { appApi } from "@/shared/api/app-api";
 import { ApiError } from "@/shared/api/api-error";
 import type {
@@ -7,7 +8,7 @@ import type {
   AppCronJob,
   AppProfileInput,
   AppUser,
-  AskConsultationStreamEvent,
+  AgUiEvent,
   CabinetMedicineInput,
   RecognizedMedicineResult,
   SpeechTranscriptionResult,
@@ -179,6 +180,74 @@ function getMedicineNoticeFromRecommends(
   recommends: Array<{ medicineId: string }>,
 ) {
   return recommends.length === 0 ? "未找到与当前描述明确匹配的家庭药箱药品，请结合症状变化及时补充描述或就医咨询。" : undefined;
+}
+
+function createRunId() {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `run-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function agUiStepText(stepName: string) {
+  const labels: Record<string, string> = {
+    prepare: "正在准备问诊",
+    lookup: "正在整理家庭药箱信息",
+    agent: "正在生成用药建议",
+    fallback: "正在整理问诊结果",
+    finalize: "正在保存问诊记录",
+  };
+
+  return labels[stepName] ?? `正在执行 ${stepName}`;
+}
+
+function readAgUiDelta(event: AgUiEvent, path: string) {
+  if (event.type !== EventType.STATE_DELTA) {
+    return undefined;
+  }
+
+  return event.delta.find((item) => item.path === path)?.value;
+}
+
+function isRecommendList(value: unknown): value is Array<{
+  medicineId: string;
+  name: string;
+  otc: "OTC" | "RX";
+  indication: string;
+  reason: string;
+  warnings: string[];
+}> {
+  return Array.isArray(value) && value.every((item) => (
+    item
+    && typeof item === "object"
+    && typeof (item as { medicineId?: unknown }).medicineId === "string"
+  ));
+}
+
+function isAudioChunkCustomEvent(event: AgUiEvent): event is AgUiEvent & {
+  type: EventType.CUSTOM;
+  value: {
+    type: "audio_chunk";
+    audioBase64: string;
+    codec: "mp3" | "wav";
+  };
+} {
+  if (event.type !== EventType.CUSTOM || event.name !== "consultation.audio_chunk") {
+    return false;
+  }
+
+  const value = event.value as { type?: unknown; audioBase64?: unknown; codec?: unknown };
+  return value?.type === "audio_chunk"
+    && typeof value.audioBase64 === "string"
+    && (value.codec === "mp3" || value.codec === "wav");
+}
+
+function getAgUiStatusMessage(event: AgUiEvent) {
+  if (event.type !== EventType.CUSTOM || event.name !== "consultation.status") {
+    return undefined;
+  }
+
+  const value = event.value as { message?: unknown };
+  return typeof value.message === "string" ? value.message : undefined;
 }
 
 function updateStreamingAssistant(
@@ -682,33 +751,74 @@ export const useAppStore = create<AppState>((set, get) => ({
       let resolvedSessionId = get().activeSessionId;
       let resolvedMessageId = placeholderId;
 
-      await appApi.askStream({
-        sessionId: get().activeSessionId,
-        question: input,
-        allowRxRecommendation: get().allowRxRecommendation,
-        audio: {
-          enabled: true,
-          codec: "mp3",
+      const runId = createRunId();
+
+      await appApi.askAgUiStream({
+        threadId: get().activeSessionId || `pending-${runId}`,
+        runId,
+        messages: [
+          {
+            id: nextMessage.id,
+            role: "user",
+            content: input,
+          },
+        ],
+        tools: [],
+        context: [],
+        state: {
+          sessionId: get().activeSessionId,
+          allowRxRecommendation: get().allowRxRecommendation,
+          audio: {
+            enabled: true,
+            codec: "mp3",
+          },
         },
-      }, (event: AskConsultationStreamEvent) => {
-        if (event.type === "session") {
-          resolvedSessionId = event.sessionId;
-          resolvedMessageId = event.messageId;
+        forwardedProps: {
+          sessionId: get().activeSessionId,
+          question: input,
+          allowRxRecommendation: get().allowRxRecommendation,
+          audio: {
+            enabled: true,
+            codec: "mp3",
+          },
+        },
+      }, (event: AgUiEvent) => {
+        if (event.type === EventType.RUN_STARTED) {
+          resolvedSessionId = event.threadId;
+          set({ activeSessionId: event.threadId });
           return;
         }
 
-        if (event.type === "status") {
+        if (event.type === EventType.STEP_STARTED) {
           set({
             activeSessionId: resolvedSessionId,
             chatMessages: updateStreamingAssistant(get().chatMessages, placeholderId, (message) => ({
               ...message,
-              statusText: event.message,
+              statusText: agUiStepText(event.stepName),
             })),
           });
           return;
         }
 
-        if (event.type === "answer_delta") {
+        const statusMessage = getAgUiStatusMessage(event);
+        if (statusMessage) {
+          set({
+            activeSessionId: resolvedSessionId,
+            chatMessages: updateStreamingAssistant(get().chatMessages, placeholderId, (message) => ({
+              ...message,
+              statusText: statusMessage,
+            })),
+          });
+          return;
+        }
+
+        if (event.type === EventType.TEXT_MESSAGE_START) {
+          resolvedMessageId = event.messageId;
+          return;
+        }
+
+        if (event.type === EventType.TEXT_MESSAGE_CONTENT) {
+          resolvedMessageId = event.messageId;
           set({
             activeSessionId: resolvedSessionId,
             chatMessages: updateStreamingAssistant(get().chatMessages, placeholderId, (message) => ({
@@ -720,18 +830,68 @@ export const useAppStore = create<AppState>((set, get) => ({
           return;
         }
 
-        if (event.type === "complete") {
-          resolvedSessionId = event.sessionId;
-          resolvedMessageId = event.messageId;
+        if (event.type === EventType.STATE_DELTA) {
+          const sessionId = readAgUiDelta(event, "/sessionId");
+          const messageId = readAgUiDelta(event, "/messageId");
+          const answer = readAgUiDelta(event, "/answer");
+          const disclaimer = readAgUiDelta(event, "/disclaimer");
+          const recommends = readAgUiDelta(event, "/recommends");
+
+          if (typeof sessionId === "string") {
+            resolvedSessionId = sessionId;
+          }
+          if (typeof messageId === "string") {
+            resolvedMessageId = messageId;
+          }
+
+          if (typeof answer === "string" || typeof disclaimer === "string" || isRecommendList(recommends)) {
+            set({
+              activeSessionId: resolvedSessionId,
+              chatMessages: updateStreamingAssistant(get().chatMessages, placeholderId, (message) => ({
+                ...message,
+                id: typeof messageId === "string" ? messageId : message.id,
+                text: typeof answer === "string" ? answer : message.text,
+                disclaimer: typeof disclaimer === "string" ? disclaimer : message.disclaimer,
+                cards: isRecommendList(recommends) ? toChatCardsFromRecommends(recommends) : message.cards,
+                medicineNotice: isRecommendList(recommends)
+                  ? getMedicineNoticeFromRecommends(recommends)
+                  : message.medicineNotice,
+                statusText: undefined,
+                timestamp: formatCurrentTime(),
+              })),
+            });
+          } else if (typeof sessionId === "string") {
+            set({ activeSessionId: sessionId });
+          }
+          return;
+        }
+
+        if (event.type === EventType.RUN_FINISHED) {
+          const result = event.result ?? {};
+          const sessionId = result.sessionId;
+          const messageId = result.messageId;
+          const answer = result.answer;
+          const disclaimer = result.disclaimer;
+          const recommends = result.recommends;
+
+          if (typeof sessionId === "string") {
+            resolvedSessionId = sessionId;
+          }
+          if (typeof messageId === "string") {
+            resolvedMessageId = messageId;
+          }
+
           set({
-            activeSessionId: event.sessionId,
+            activeSessionId: resolvedSessionId,
             chatMessages: updateStreamingAssistant(get().chatMessages, placeholderId, (message) => ({
               ...message,
-              id: event.messageId,
-              text: event.answer,
-              disclaimer: event.disclaimer,
-              cards: toChatCardsFromRecommends(event.recommends),
-              medicineNotice: getMedicineNoticeFromRecommends(event.recommends),
+              id: typeof messageId === "string" ? messageId : resolvedMessageId,
+              text: typeof answer === "string" ? answer : message.text,
+              disclaimer: typeof disclaimer === "string" ? disclaimer : message.disclaimer,
+              cards: isRecommendList(recommends) ? toChatCardsFromRecommends(recommends) : message.cards,
+              medicineNotice: isRecommendList(recommends)
+                ? getMedicineNoticeFromRecommends(recommends)
+                : message.medicineNotice,
               statusText: undefined,
               timestamp: formatCurrentTime(),
             })),
@@ -739,16 +899,12 @@ export const useAppStore = create<AppState>((set, get) => ({
           return;
         }
 
-        if (event.type === "audio_chunk") {
-          enqueueBase64Audio(event.audioBase64, event.codec);
+        if (isAudioChunkCustomEvent(event)) {
+          enqueueBase64Audio(event.value.audioBase64, event.value.codec);
           return;
         }
 
-        if (event.type === "audio_meta" || event.type === "audio_done" || event.type === "audio_error") {
-          return;
-        }
-
-        if (event.type === "error") {
+        if (event.type === EventType.RUN_ERROR) {
           throw new Error(event.message);
         }
       });

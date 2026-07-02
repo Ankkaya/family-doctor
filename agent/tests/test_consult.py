@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from collections.abc import Generator
+from collections.abc import Iterable
 import json
 from typing import TypeVar
 
@@ -377,6 +378,72 @@ def test_consult_stream_reports_node_progress(client: TestClient) -> None:
     assert "".join(answer_deltas) == complete["answer"]
     assert complete["disclaimer"]
     assert len(complete["traces"]) >= 4
+
+
+def test_ag_ui_stream_reports_standard_events(client: TestClient) -> None:
+    with client.stream(
+        "POST",
+        "/agent/ag-ui",
+        headers={"Accept": "text/event-stream"},
+        json={
+            "threadId": "s-ag-ui",
+            "runId": "run-ag-ui",
+            "state": {},
+            "messages": [
+                {
+                    "id": "msg-user",
+                    "role": "user",
+                    "content": "这两天头痛发热，家里能吃什么药",
+                },
+            ],
+            "tools": [],
+            "context": [],
+            "forwardedProps": {
+                "sessionId": "s-ag-ui",
+                "messageId": "msg-assistant",
+                "medicines": SAMPLE_MEDICINES,
+            },
+        },
+    ) as response:
+        assert response.status_code == 200
+        events = _parse_sse_events(response.iter_lines())
+
+    event_types = [event["type"] for event in events]
+    assert "RUN_STARTED" in event_types
+    assert "TEXT_MESSAGE_START" in event_types
+    assert "TEXT_MESSAGE_CONTENT" in event_types
+    assert "TEXT_MESSAGE_END" in event_types
+    assert "STATE_DELTA" in event_types
+    assert event_types[-1] == "RUN_FINISHED"
+
+    answer = "".join(
+        event["delta"]
+        for event in events
+        if event["type"] == "TEXT_MESSAGE_CONTENT"
+    )
+    finished = events[-1]
+    assert finished["result"]["answer"] == answer
+    assert finished["result"]["messageId"] == "msg-assistant"
+    assert finished["result"]["recommends"]
+
+
+def _parse_sse_events(lines: Iterable[str]) -> list[dict[str, object]]:
+    events: list[dict[str, object]] = []
+    data_lines: list[str] = []
+
+    for line in lines:
+        if line.startswith("data:"):
+            data_lines.append(line.removeprefix("data:").strip())
+            continue
+
+        if line == "" and data_lines:
+            events.append(json.loads("\n".join(data_lines)))
+            data_lines = []
+
+    if data_lines:
+        events.append(json.loads("\n".join(data_lines)))
+
+    return events
 
 
 def test_recognize_medicine_images(client: TestClient) -> None:
