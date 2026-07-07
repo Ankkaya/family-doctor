@@ -7,6 +7,7 @@ from ...llm.provider import LLMProvider
 from ...prompting import load_prompt
 from ...schemas import ParsedSymptoms, Recommend
 from ...tracing import trace_node
+from ..context import dump_conversation_context
 
 RENDER_PROMPT_KEY = "consult.render.system"
 RENDER_PROMPT_VERSION = "v1"
@@ -51,6 +52,7 @@ def make_render_node(llm: LLMProvider, *, disclaimer: str):
                 prompt_user = None
             else:
                 prompt_user = (
+                    f"对话上下文: {dump_conversation_context(state)}\n"
                     f"症状: {', '.join(parsed.symptoms) or '未明确'}\n"
                     f"严重度: {parsed.severity}\n"
                     f"候选药品数: {len(risked)}\n"

@@ -127,9 +127,10 @@ async function main() {
   const familyDoctorMenuItems = [
     { id: 31, name: '家庭药品汇总', path: '/family-doctor/medicines', icon: 'material-symbols:pill-outline', component: 'views/family-doctor/household-medicines/index', permission: 'family-doctor:household-medicine:view', parentId: familyDoctorMenu.id, order: 1 },
     { id: 32, name: '问诊日志', path: '/family-doctor/consultations', icon: 'material-symbols:chat-outline', component: 'views/family-doctor/consultations/index', permission: 'family-doctor:consultation:view', parentId: familyDoctorMenu.id, order: 2 },
-    { id: 35, name: 'App 用户', path: '/family-doctor/app-users', icon: 'material-symbols:supervised-user-circle-outline', component: 'views/family-doctor/app-users/index', permission: 'family-doctor:app-user:view', parentId: familyDoctorMenu.id, order: 3 },
-    { id: 33, name: '家庭管理', path: '/family-doctor/households', icon: 'material-symbols:home-health-outline', component: 'views/family-doctor/households/index', permission: 'family-doctor:household:view', parentId: familyDoctorMenu.id, order: 4 },
-    { id: 34, name: '家庭药箱', path: '/family-doctor/household-medicines', icon: 'material-symbols:medication-outline', component: 'views/family-doctor/household-medicines/index', permission: 'family-doctor:household-medicine:view', parentId: familyDoctorMenu.id, order: 5 },
+    { id: 36, name: 'Agent 调试', path: '/family-doctor/agent-debug', icon: 'material-symbols:account-tree-outline', component: 'views/family-doctor/agent-debug/index', permission: 'family-doctor:consultation:view', parentId: familyDoctorMenu.id, order: 3 },
+    { id: 35, name: 'App 用户', path: '/family-doctor/app-users', icon: 'material-symbols:supervised-user-circle-outline', component: 'views/family-doctor/app-users/index', permission: 'family-doctor:app-user:view', parentId: familyDoctorMenu.id, order: 4 },
+    { id: 33, name: '家庭管理', path: '/family-doctor/households', icon: 'material-symbols:home-health-outline', component: 'views/family-doctor/households/index', permission: 'family-doctor:household:view', parentId: familyDoctorMenu.id, order: 5 },
+    { id: 34, name: '家庭药箱', path: '/family-doctor/household-medicines', icon: 'material-symbols:medication-outline', component: 'views/family-doctor/household-medicines/index', permission: 'family-doctor:household-medicine:view', parentId: familyDoctorMenu.id, order: 6 },
   ];
 
   for (const item of familyDoctorMenuItems) {

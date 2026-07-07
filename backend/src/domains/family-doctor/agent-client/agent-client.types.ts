@@ -18,6 +18,26 @@ export type AgentUserProfile = {
   medicationHistory?: string | null;
 };
 
+export type AgentHistoryMessage = {
+  role: 'USER' | 'ASSISTANT';
+  content: string;
+  createdAt: string;
+};
+
+export type AgentSessionSummary = {
+  chiefComplaint?: string | null;
+  symptoms: string[];
+  duration?: string | null;
+  riskFlags: string[];
+  mentionedMedicines: string[];
+  rejectedMedicines: string[];
+  recommendedMedicines: string[];
+  temporaryUserFacts: string[];
+  unresolvedQuestions: string[];
+  lastTopic?: string | null;
+  suggestedStatus?: 'active' | 'resolved' | 'stale' | 'closed';
+};
+
 export type AgentRecommend = {
   medicineId: string;
   name: string;
@@ -55,6 +75,9 @@ export type AgentConsultInput = {
     content: string;
   }>;
   userProfile?: AgentUserProfile | null;
+  historyMessages?: AgentHistoryMessage[];
+  sessionSummary?: AgentSessionSummary | null;
+  conversationStatus?: 'active' | 'resolved' | 'stale' | 'closed';
   allowRxRecommendation?: boolean;
   timezone?: string;
   now?: string;
@@ -64,6 +87,7 @@ export type AgentConsultOutput = {
   answer: string;
   recommends: AgentRecommend[];
   disclaimer: string;
+  sessionSummary?: AgentSessionSummary | null;
   traces: AgentTraceStep[];
 };
 

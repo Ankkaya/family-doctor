@@ -744,4 +744,8 @@ export const appApi = {
   async listCronJobExecutions(jobId: string) {
     return httpClient.getJson<AppCronJobExecution[]>(`/cron-jobs/${jobId}/executions`);
   },
+
+  async closeHistory(id: string) {
+    return httpClient.patchJson<{ success: boolean }>(`/consultation/sessions/${id}/close`, {});
+  },
 };

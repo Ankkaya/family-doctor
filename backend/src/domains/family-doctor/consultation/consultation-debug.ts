@@ -33,21 +33,25 @@ const NODE_SPECS: Record<string, ConsultationNodeSpec> = {
   preprocess: {
     nodeName: 'preprocess',
     title: '输入预处理',
-    description: '对用户原始问题做规则归一化，统一常见症状和时间表达，减少后续节点理解偏差。',
-    capabilities: ['规则归一化', '症状别名映射', '时间表达清洗'],
+    description: '对用户原始问题做低风险格式规范化，只清理可确定的文本形态，不做症状同义词替换，也不承担病情语义理解。',
+    capabilities: ['首尾空白清理', '全角数字/常见标点转半角', '体温格式规范化', '时间表达轻量规范化', '空白压缩', '改动记录'],
     expectedInput: ['question: 用户原始问题文本'],
-    expectedOutput: ['normalizedQuestion: 归一化后的问题文本'],
-    promptExpectation: '无 LLM Prompt，纯规则处理。',
+    expectedOutput: [
+      'originalQuestion: 原始问题，完整保留用户输入',
+      'normalizedQuestion: 规范化后的文本，仅作为后续节点的格式参考',
+      'changes: 本次预处理改动列表，包含 trim/fullwidth/temperature/duration/whitespace 等类型',
+    ],
+    promptExpectation: '无 LLM Prompt，纯规则处理；语义理解交给 parse/review 节点。',
   },
   parse: {
     nodeName: 'parse',
     title: '症状结构化',
     description: '调用结构化输出模型，从问题中提取症状、严重程度、持续时间、人群线索和急症信号。',
     capabilities: ['LLM structured output', '症状抽取', '急症初筛'],
-    expectedInput: ['question: 归一化问题文本'],
+    expectedInput: ['originalQuestion: 用户原始问题', 'normalizedQuestion: 规范化文本，仅作格式参考'],
     expectedOutput: ['symptoms', 'severity', 'duration', 'populationHints', 'emergency'],
     promptKey: 'consult.parse.system',
-    promptExpectation: 'System Prompt + 用户问题文本。',
+    promptExpectation: 'System Prompt + 包含原文和规范化文本的 JSON 用户 Prompt。',
   },
   emergency: {
     nodeName: 'emergency',
@@ -105,6 +109,15 @@ const NODE_SPECS: Record<string, ConsultationNodeSpec> = {
     promptKey: 'consult.render.system',
     promptExpectation: '有推荐时调用 System Prompt + 结构化摘要；无推荐或急症时跳过模型。',
   },
+  summarize: {
+    nodeName: 'summarize',
+    title: '会话摘要更新',
+    description: '把本轮问诊结果合并进结构化会话摘要，供长对话后续轮次压缩上下文使用。',
+    capabilities: ['摘要合并', '推荐/拒绝药品留痕', '临时风险事实提取', '会话状态建议'],
+    expectedInput: ['existingSummary: 旧摘要', 'parsedSymptoms', 'reviewDecisions', 'recommends', 'riskFlags'],
+    expectedOutput: ['sessionSummary: 更新后的结构化摘要', 'suggestedStatus'],
+    promptExpectation: '无 LLM Prompt，基于本轮结构化结果做规则合并。',
+  },
 };
 
 const PROMPT_DEFINITIONS: PromptDefinition[] = [
@@ -115,8 +128,8 @@ const PROMPT_DEFINITIONS: PromptDefinition[] = [
     version: 'v1',
     sourceFile: 'agent/prompts/parse.system.v1.md',
     mode: 'system+user-template',
-    variables: ['question'],
-    inputContract: ['question: 用户问题文本'],
+    variables: ['originalQuestion', 'normalizedQuestion'],
+    inputContract: ['originalQuestion: 用户原始问题', 'normalizedQuestion: 规范化文本，仅作格式参考'],
     outputContract: ['symptoms', 'severity', 'duration', 'populationHints', 'emergency'],
     summary: '把自然语言问题转成结构化症状字段。',
   },

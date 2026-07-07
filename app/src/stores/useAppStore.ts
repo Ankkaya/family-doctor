@@ -745,7 +745,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ chatLoading: false });
     }
   },
-  newChat: () =>
+  newChat: () => {
+    const sessionId = get().activeSessionId;
+    if (sessionId) {
+      void appApi.closeHistory(sessionId).catch(() => undefined);
+    }
+
     set({
       activeTab: "chat",
       currentScreen: "chat",
@@ -753,5 +758,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       chatInput: "",
       activeSessionId: undefined,
       chatError: undefined,
-    }),
+    });
+  },
 }));

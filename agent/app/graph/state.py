@@ -5,7 +5,7 @@ from typing import Annotated
 
 from typing_extensions import TypedDict
 
-from ..schemas import MedicineBrief, ParsedSymptoms, Recommend, TraceStep, UserProfile
+from ..schemas import HistoryMessage, MedicineBrief, ParsedSymptoms, Recommend, SessionSummary, TraceStep, UserProfile
 
 
 class GraphState(TypedDict, total=False):
@@ -15,6 +15,9 @@ class GraphState(TypedDict, total=False):
     normalized_question: str
     medicines: list[MedicineBrief]
     user_profile: UserProfile
+    history_messages: list[HistoryMessage]
+    session_summary: SessionSummary
+    conversation_status: str
     allow_rx_recommendation: bool
 
     # Intermediate
@@ -32,6 +35,7 @@ class GraphState(TypedDict, total=False):
     answer: str
     recommends: list[Recommend]
     disclaimer: str
+    updated_session_summary: SessionSummary
 
     # Trace accumulation (LangGraph merges via list concat)
     traces: Annotated[list[TraceStep], add]

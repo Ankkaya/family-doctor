@@ -44,6 +44,29 @@ class ConversationMessageBrief(_CamelModel):
     content: str
 
 
+class HistoryMessage(_CamelModel):
+    role: Literal["USER", "ASSISTANT"]
+    content: str
+    created_at: str | None = Field(default=None, alias="createdAt")
+
+
+class SessionSummary(_CamelModel):
+    chief_complaint: str | None = Field(default=None, alias="chiefComplaint")
+    symptoms: list[str] = Field(default_factory=list)
+    duration: str | None = None
+    risk_flags: list[str] = Field(default_factory=list, alias="riskFlags")
+    mentioned_medicines: list[str] = Field(default_factory=list, alias="mentionedMedicines")
+    rejected_medicines: list[str] = Field(default_factory=list, alias="rejectedMedicines")
+    recommended_medicines: list[str] = Field(default_factory=list, alias="recommendedMedicines")
+    temporary_user_facts: list[str] = Field(default_factory=list, alias="temporaryUserFacts")
+    unresolved_questions: list[str] = Field(default_factory=list, alias="unresolvedQuestions")
+    last_topic: str | None = Field(default=None, alias="lastTopic")
+    suggested_status: Literal["active", "resolved", "stale", "closed"] = Field(
+        default="active",
+        alias="suggestedStatus",
+    )
+
+
 class Recommend(_CamelModel):
     medicine_id: str = Field(alias="medicineId")
     name: str
@@ -85,6 +108,12 @@ class ConsultRequest(_CamelModel):
     members: list[MemberBrief] = Field(default_factory=list)
     history: list[ConversationMessageBrief] = Field(default_factory=list)
     user_profile: UserProfile | None = Field(default=None, alias="userProfile")
+    history_messages: list[HistoryMessage] = Field(default_factory=list, alias="historyMessages")
+    session_summary: SessionSummary | None = Field(default=None, alias="sessionSummary")
+    conversation_status: Literal["active", "resolved", "stale", "closed"] = Field(
+        default="active",
+        alias="conversationStatus",
+    )
     allow_rx_recommendation: bool = Field(default=False, alias="allowRxRecommendation")
     timezone: str = "Asia/Shanghai"
     now: str | None = None
@@ -94,6 +123,7 @@ class ConsultResponse(_CamelModel):
     answer: str
     recommends: list[Recommend]
     disclaimer: str
+    session_summary: SessionSummary | None = Field(default=None, alias="sessionSummary")
     traces: list[TraceStep]
 
 

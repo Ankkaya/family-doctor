@@ -9,6 +9,7 @@ from ...prompting import load_prompt
 from ...schemas import MedicineBrief, ParsedSymptoms, Recommend, RiskReviewOutput, UserProfile
 from ...tools.safety_tools import build_recommendation, normalize_profile_text
 from ...tracing import trace_node
+from ..context import dump_conversation_context
 
 REVIEW_PROMPT_KEY = "consult.review.system"
 REVIEW_PROMPT_VERSION = "v1"
@@ -29,6 +30,7 @@ def make_review_node(llm: LLMProvider):
             flags=flags,
             candidates=candidates,
             allow_rx_recommendation=allow_rx_recommendation,
+            conversation_context=dump_conversation_context(state),
         )
         with trace_node(
             "review",
@@ -59,39 +61,40 @@ def make_review_node(llm: LLMProvider):
                     "decisions": [],
                     "reviewed": 0,
                 })
-                return {"risked": [], "review_decisions": [], "traces": [rec.step]}
-
-            review_output = await llm.structured(
-                system=REVIEW_SYSTEM,
-                user=prompt_payload,
-                schema=RiskReviewOutput,
-            )
-            risked, decisions = apply_review(
-                candidates=candidates,
-                parsed=parsed,
-                profile=profile,
-                flags=flags,
-                allow_rx_recommendation=allow_rx_recommendation,
-                review=review_output,
-            )
-            rec.set_output({
-                "recommended": [
-                    {"medicineId": item.medicine_id, "name": item.name}
-                    for item in risked
-                ],
-                "rejected": [
-                    {
-                        "medicineId": item["medicineId"],
-                        "name": item["name"],
-                        "reason": item["rejectReason"],
-                    }
-                    for item in decisions
-                    if not item["suitable"]
-                ],
-                "decisions": decisions,
-                "reviewed": len(review_output.items),
-            })
-            rec.set_llm(model=llm.model)
+                risked: list[Recommend] = []
+                decisions: list[dict[str, Any]] = []
+            else:
+                review_output = await llm.structured(
+                    system=REVIEW_SYSTEM,
+                    user=prompt_payload,
+                    schema=RiskReviewOutput,
+                )
+                risked, decisions = apply_review(
+                    candidates=candidates,
+                    parsed=parsed,
+                    profile=profile,
+                    flags=flags,
+                    allow_rx_recommendation=allow_rx_recommendation,
+                    review=review_output,
+                )
+                rec.set_output({
+                    "recommended": [
+                        {"medicineId": item.medicine_id, "name": item.name}
+                        for item in risked
+                    ],
+                    "rejected": [
+                        {
+                            "medicineId": item["medicineId"],
+                            "name": item["name"],
+                            "reason": item["rejectReason"],
+                        }
+                        for item in decisions
+                        if not item["suitable"]
+                    ],
+                    "decisions": decisions,
+                    "reviewed": len(review_output.items),
+                })
+                rec.set_llm(model=llm.model)
         return {"risked": risked, "review_decisions": decisions, "traces": [rec.step]}
 
     return review
@@ -105,9 +108,11 @@ def build_review_prompt(
     flags: list[str],
     candidates: list[MedicineBrief],
     allow_rx_recommendation: bool,
+    conversation_context: dict[str, Any],
 ) -> str:
     payload = {
         "question": question,
+        "conversationContext": conversation_context,
         "parsedSymptoms": parsed.model_dump(by_alias=True),
         "userProfile": dump_user_profile(profile),
         "riskFlags": flags,

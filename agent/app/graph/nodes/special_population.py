@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ...schemas import ParsedSymptoms, UserProfile
+from ...schemas import ParsedSymptoms, SessionSummary, UserProfile
 from ...tools.safety_tools import normalize_profile_text
 from ...tracing import trace_node
 
@@ -11,6 +11,7 @@ from ...tracing import trace_node
 def make_special_population_node():
     async def special_population(state: dict[str, Any]) -> dict[str, Any]:
         profile: UserProfile | None = state.get("user_profile")
+        summary: SessionSummary | None = state.get("session_summary")
         parsed: ParsedSymptoms = state["parsed"]
         question = state.get("normalized_question") or state["question"]
         with trace_node(
@@ -22,6 +23,8 @@ def make_special_population_node():
             },
         ) as rec:
             flags = set(parsed.population_hints)
+            temporary_facts = summary.temporary_user_facts if summary else []
+            profile_text = " ".join(temporary_facts)
             if profile:
                 if profile.age is not None and profile.age < 12:
                     flags.add("child")
@@ -38,13 +41,14 @@ def make_special_population_node():
                         chronic_diseases,
                         medication_history,
                         allergies,
+                        *temporary_facts,
                     ]
                     if item
                 )
-                if any(keyword in f"{question} {profile_text}" for keyword in ["孕", "怀孕", "妊娠"]):
-                    flags.add("pregnant")
-                if "哺乳" in f"{question} {profile_text}":
-                    flags.add("lactating")
+            if any(keyword in f"{question} {profile_text}" for keyword in ["孕", "怀孕", "妊娠"]):
+                flags.add("pregnant")
+            if "哺乳" in f"{question} {profile_text}":
+                flags.add("lactating")
             rec.set_output({"flags": sorted(flags)})
         return {"special_population_flags": sorted(flags), "traces": [rec.step]}
 

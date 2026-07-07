@@ -137,8 +137,33 @@ export interface ConsultationSession {
   userNickname?: string | null;
   userPhone?: string | null;
   title: string | null;
+  summary?: ConsultationSessionSummary | null;
+  summaryUpdatedAt?: string | null;
+  status?: ConsultationSessionStatus;
   createdAt: string;
   messageCount: number;
+}
+
+export type ConsultationSessionStatus = 'active' | 'resolved' | 'stale' | 'closed' | string;
+
+export interface ConsultationSessionSummary {
+  chiefComplaint?: string | null;
+  symptoms: string[];
+  duration?: string | null;
+  riskFlags: string[];
+  mentionedMedicines: string[];
+  rejectedMedicines: string[];
+  recommendedMedicines: string[];
+  temporaryUserFacts: string[];
+  unresolvedQuestions: string[];
+  lastTopic?: string | null;
+  suggestedStatus?: ConsultationSessionStatus;
+}
+
+export interface ConsultationHistoryMessage {
+  role: 'USER' | 'ASSISTANT';
+  content: string;
+  createdAt?: string;
 }
 
 export interface ConsultationMessage {
@@ -214,6 +239,33 @@ export interface ConsultationDetail extends ConsultationSession {
   traces: AgentTrace[];
   turns: ConsultationTurn[];
   promptCatalog: ConsultationPromptCatalogItem[];
+}
+
+export interface ConsultationDebugRunParams {
+  question: string;
+  householdId?: string | null;
+  userId?: string | null;
+  allowRxRecommendation?: boolean;
+  historyMessages?: ConsultationHistoryMessage[];
+  sessionSummary?: Partial<ConsultationSessionSummary> | null;
+  conversationStatus?: ConsultationSessionStatus;
+}
+
+export interface ConsultationDebugRunResult {
+  debugRunId: string;
+  question: string;
+  householdId: string | null;
+  userId: string | null;
+  medicineCount: number;
+  userProfile: Record<string, unknown> | null;
+  answer: string;
+  recommends: unknown[];
+  disclaimer: string;
+  sessionSummary: ConsultationSessionSummary | null;
+  traces: AgentTrace[];
+  nodeSpecs: ConsultationNodeSpec[];
+  promptCatalog: ConsultationPromptCatalogItem[];
+  createdAt: string;
 }
 
 export const getAdminMedicines = (params?: { keyword?: string; page?: number; pageSize?: number }) => {
@@ -308,6 +360,10 @@ export const getAdminConsultation = (id: string) => {
 
 export const getAdminConsultationPromptCatalog = () => {
   return api.get<ConsultationPromptCatalogItem[]>('/admin/consultations-debug/prompts');
+};
+
+export const runAdminConsultationDebug = (data: ConsultationDebugRunParams) => {
+  return api.post<ConsultationDebugRunResult>('/admin/consultations-debug/run', data);
 };
 
 export const deleteAdminConsultation = (id: string) => {

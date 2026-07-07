@@ -347,6 +347,9 @@ model ConsultationSession {
   householdId String?             @map("household_id")
   devUserId String?               @map("dev_user_id")
   title     String?
+  summary   Json?
+  summaryUpdatedAt DateTime?       @map("summary_updated_at")
+  status    String                 @default("active")
   createdAt DateTime              @default(now()) @map("created_at")
   deletedAt DateTime?             @map("deleted_at")
   user      AppUser?              @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -357,6 +360,7 @@ model ConsultationSession {
   @@index([devUserId, createdAt])
   @@index([householdId, createdAt])
   @@index([userId, createdAt])
+  @@index([status])
   @@index([deletedAt])
   @@map("consultation_session")
 }

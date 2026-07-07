@@ -10,6 +10,8 @@
                 <span class="session-meta-pill">家庭：{{ detail.householdName || detail.householdId || '-' }}</span>
                 <span class="session-meta-pill">用户：{{ detail.userNickname || detail.userPhone || detail.userId || detail.devUserId || '-' }}</span>
                 <span class="session-meta-pill">创建时间：{{ formatDate(detail.createdAt) }}</span>
+                <span class="session-meta-pill">状态：{{ statusLabel(detail.status) }}</span>
+                <span class="session-meta-pill">摘要更新：{{ formatDate(detail.summaryUpdatedAt || '') }}</span>
                 <span class="session-meta-pill">轮次：{{ detail.turns.length }}</span>
                 <span class="session-meta-pill">节点：{{ detail.traces.length }}</span>
                 <span class="session-meta-pill">当前：{{ selectedTurn ? `第 ${selectedTurn.turnIndex} 轮` : '-' }}</span>
@@ -18,6 +20,54 @@
             <div class="session-strip__actions">
               <n-button @click="goBack">返回列表</n-button>
             </div>
+          </section>
+
+          <section class="memory-panel">
+            <div class="section-header">
+              <div>
+                <h3 class="section-title">会话 Memory</h3>
+                <p class="section-description">当前会话摘要会在长对话中与最近消息一起传给 Agent。</p>
+              </div>
+            </div>
+            <div v-if="detail.summary" class="memory-grid">
+              <div class="memory-card memory-card--wide">
+                <p class="trace-label">主诉 / 主题</p>
+                <p class="memory-text">{{ detail.summary.chiefComplaint || detail.summary.lastTopic || '-' }}</p>
+              </div>
+              <div class="memory-card">
+                <p class="trace-label">症状</p>
+                <div class="tag-list">
+                  <n-tag v-for="item in detail.summary.symptoms || []" :key="item" size="small" type="info" round>{{ item }}</n-tag>
+                  <span v-if="!detail.summary.symptoms?.length" class="muted-text">-</span>
+                </div>
+              </div>
+              <div class="memory-card">
+                <p class="trace-label">风险标签</p>
+                <div class="tag-list">
+                  <n-tag v-for="item in detail.summary.riskFlags || []" :key="item" size="small" type="warning" round>{{ item }}</n-tag>
+                  <span v-if="!detail.summary.riskFlags?.length" class="muted-text">-</span>
+                </div>
+              </div>
+              <div class="memory-card">
+                <p class="trace-label">推荐药品</p>
+                <div class="tag-list">
+                  <n-tag v-for="item in detail.summary.recommendedMedicines || []" :key="item" size="small" type="success" round>{{ item }}</n-tag>
+                  <span v-if="!detail.summary.recommendedMedicines?.length" class="muted-text">-</span>
+                </div>
+              </div>
+              <div class="memory-card">
+                <p class="trace-label">拒绝药品</p>
+                <div class="tag-list">
+                  <n-tag v-for="item in detail.summary.rejectedMedicines || []" :key="item" size="small" type="error" round>{{ item }}</n-tag>
+                  <span v-if="!detail.summary.rejectedMedicines?.length" class="muted-text">-</span>
+                </div>
+              </div>
+              <div class="memory-card memory-card--wide">
+                <p class="trace-label">临时用户事实</p>
+                <p class="memory-text">{{ (detail.summary.temporaryUserFacts || []).join('；') || '-' }}</p>
+              </div>
+            </div>
+            <n-empty v-else description="当前会话还没有摘要" size="small" />
           </section>
 
           <div class="detail-content-grid">
@@ -299,6 +349,16 @@ function formatDate(value: string) {
   return value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-';
 }
 
+function statusLabel(status?: string) {
+  const labels: Record<string, string> = {
+    active: '进行中',
+    resolved: '已总结',
+    stale: '已超时',
+    closed: '已关闭',
+  };
+  return labels[status || 'active'] || status || '进行中';
+}
+
 function formatJson(value: unknown) {
   return JSON.stringify(value, null, 2);
 }
@@ -410,6 +470,7 @@ onMounted(() => {
 }
 
 .session-strip,
+.memory-panel,
 .conversation-panel,
 .trace-panel,
 .timeline-card,
@@ -430,6 +491,43 @@ onMounted(() => {
   justify-content: space-between;
   gap: 16px;
   padding: 14px 16px;
+}
+
+.memory-panel {
+  padding: 16px;
+}
+
+.memory-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.memory-card {
+  min-width: 0;
+  border: 1px solid var(--fd-detail-border);
+  border-radius: 10px;
+  padding: 12px;
+  background: var(--fd-detail-surface-soft);
+  box-sizing: border-box;
+}
+
+.memory-card--wide {
+  grid-column: span 2;
+}
+
+.memory-text,
+.muted-text {
+  margin: 0;
+  color: var(--n-text-color-2);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .session-strip__main {
@@ -626,7 +724,6 @@ onMounted(() => {
 }
 
 .trace-timeline-item :deep(.n-timeline-item-content) {
-  width: 100%;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
@@ -848,12 +945,16 @@ onMounted(() => {
 }
 
 :global(html.dark .consultation-detail-page .session-strip),
+:global(html.dark .consultation-detail-page .memory-panel),
+:global(html.dark .consultation-detail-page .memory-card),
 :global(html.dark .consultation-detail-page .conversation-panel),
 :global(html.dark .consultation-detail-page .trace-panel),
 :global(html.dark .consultation-detail-page .timeline-card),
 :global(html.dark .consultation-detail-page .contract-card),
 :global(html.dark .consultation-detail-page .message-item),
 :global(.dark .consultation-detail-page .session-strip),
+:global(.dark .consultation-detail-page .memory-panel),
+:global(.dark .consultation-detail-page .memory-card),
 :global(.dark .consultation-detail-page .conversation-panel),
 :global(.dark .consultation-detail-page .trace-panel),
 :global(.dark .consultation-detail-page .timeline-card),
@@ -947,6 +1048,7 @@ onMounted(() => {
 
 @media (max-width: 1024px) {
   .session-strip,
+  .memory-grid,
   .trace-contract-grid,
   .trace-grid,
   .trace-contract-grid--triple {
@@ -959,6 +1061,10 @@ onMounted(() => {
 
   .trace-timeline-item :deep(.n-timeline-item-content) {
     min-width: 0;
+  }
+
+  .memory-card--wide {
+    grid-column: span 1;
   }
 }
 </style>

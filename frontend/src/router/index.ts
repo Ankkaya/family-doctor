@@ -93,6 +93,12 @@ const router = createRouter({
           meta: { title: '问诊日志', permission: 'family-doctor:consultation:view' }
         },
         {
+          path: 'agent-debug',
+          name: 'family-doctor-agent-debug',
+          component: () => import('@/views/family-doctor/agent-debug/index.vue'),
+          meta: { title: 'Agent 调试', permission: 'family-doctor:consultation:view' }
+        },
+        {
           path: 'consultations/prompts',
           name: 'family-doctor-consultation-prompts',
           component: () => import('@/views/family-doctor/consultation-prompts/index.vue'),

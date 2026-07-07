@@ -46,7 +46,10 @@ SAMPLE_MEDICINES = [
 
 def _keyword_symptoms(text: str) -> list[str]:
     candidates = ["头痛", "头疼", "发热", "咳嗽", "咽痛", "腹泻", "恶心", "呕吐", "流涕", "鼻塞", "口腔溃疡"]
-    return [kw for kw in candidates if kw in text]
+    symptoms = [kw for kw in candidates if kw in text]
+    if "头好疼" in text and "头疼" not in symptoms:
+        symptoms.append("头疼")
+    return symptoms
 
 
 class FakeProvider:
@@ -174,6 +177,48 @@ def test_consult_basic(client: TestClient) -> None:
     # trace 至少 4 个节点
     assert len(body["traces"]) >= 4
     assert {t["nodeName"] for t in body["traces"]} >= {"parse", "match", "review", "render"}
+    assert body["sessionSummary"]["symptoms"]
+    assert "summarize" in {t["nodeName"] for t in body["traces"]}
+
+
+def test_consult_uses_history_for_follow_up_question(client: TestClient) -> None:
+    r = client.post(
+        "/agent/consult",
+        json={
+            "sessionId": "s-follow-up",
+            "question": "那这个药饭后吃可以吗",
+            "historyMessages": [
+                {
+                    "role": "USER",
+                    "content": "我这两天头痛发热，家里有什么药",
+                    "createdAt": "2026-06-18T09:00:00.000Z",
+                },
+                {
+                    "role": "ASSISTANT",
+                    "content": "可考虑布洛芬缓释胶囊，并注意胃部不适风险。",
+                    "createdAt": "2026-06-18T09:01:00.000Z",
+                },
+            ],
+            "sessionSummary": {
+                "chiefComplaint": "头痛、发热",
+                "symptoms": ["头痛", "发热"],
+                "riskFlags": [],
+                "mentionedMedicines": ["布洛芬缓释胶囊"],
+                "rejectedMedicines": [],
+                "recommendedMedicines": ["布洛芬缓释胶囊"],
+                "temporaryUserFacts": [],
+                "unresolvedQuestions": [],
+                "lastTopic": "头痛、发热",
+                "suggestedStatus": "resolved",
+            },
+            "medicines": SAMPLE_MEDICINES,
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    names = [item["name"] for item in body["recommends"]]
+    assert "布洛芬缓释胶囊" in names
+    assert "头痛" in body["sessionSummary"]["symptoms"]
 
 
 def test_consult_does_not_recommend_weak_vector_match_for_headache(client: TestClient) -> None:

@@ -31,6 +31,7 @@ NODE_STATUS_MESSAGES = {
     "review": "正在审查药品适配性",
     "safety": "正在进行安全审核",
     "render": "正在组织回复",
+    "summarize": "正在更新会话摘要",
 }
 
 
@@ -47,6 +48,9 @@ async def consult(payload: ConsultRequest, request: Request) -> ConsultResponse:
             "question": payload.question,
             "medicines": payload.medicines,
             "user_profile": payload.user_profile,
+            "history_messages": payload.history_messages,
+            "session_summary": payload.session_summary,
+            "conversation_status": payload.conversation_status,
             "allow_rx_recommendation": payload.allow_rx_recommendation,
             "traces": [],
         }
@@ -55,6 +59,7 @@ async def consult(payload: ConsultRequest, request: Request) -> ConsultResponse:
         answer=result["answer"],
         recommends=result["recommends"],
         disclaimer=result["disclaimer"],
+        sessionSummary=result.get("updated_session_summary"),
         traces=[trace for trace in result["traces"] if trace is not None],
     )
 
@@ -90,6 +95,9 @@ async def consult_stream(payload: ConsultRequest, request: Request) -> Streaming
             "question": payload.question,
             "medicines": payload.medicines,
             "user_profile": payload.user_profile,
+            "history_messages": payload.history_messages,
+            "session_summary": payload.session_summary,
+            "conversation_status": payload.conversation_status,
             "allow_rx_recommendation": payload.allow_rx_recommendation,
             "traces": [],
         }
@@ -120,6 +128,7 @@ async def consult_stream(payload: ConsultRequest, request: Request) -> Streaming
             answer=state["answer"],
             recommends=state["recommends"],
             disclaimer=state["disclaimer"],
+            sessionSummary=state.get("updated_session_summary"),
             traces=state["traces"],
         )
         for chunk in _iter_answer_chunks(output.answer):

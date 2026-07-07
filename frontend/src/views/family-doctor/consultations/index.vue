@@ -47,7 +47,7 @@
 import { h, onMounted, reactive, ref, type VNode } from 'vue';
 import { useRouter } from 'vue-router';
 import type { DataTableColumns } from 'naive-ui';
-import { NButton, NSpace, useDialog, useMessage } from 'naive-ui';
+import { NButton, NSpace, NTag, useDialog, useMessage } from 'naive-ui';
 import dayjs from 'dayjs';
 import PagePagination from '@/components/common/PagePagination.vue';
 import PageSearchCard from '@/components/common/PageSearchCard.vue';
@@ -84,8 +84,24 @@ const columns: DataTableColumns<ConsultationSession> = [
   { title: '标题', key: 'title', minWidth: 220, ellipsis: { tooltip: true }, render: row => row.title || '-' },
   { title: '家庭', key: 'householdName', minWidth: 160, render: row => row.householdName || row.householdId || '-' },
   { title: '用户', key: 'userNickname', minWidth: 150, render: row => row.userNickname || row.userPhone || row.userId || row.devUserId || '-' },
+  {
+    title: '状态',
+    key: 'status',
+    width: 96,
+    render: row => h(NTag, { size: 'small', type: statusTagType(row.status), round: true }, {
+      default: () => statusLabel(row.status),
+    }),
+  },
+  {
+    title: '摘要',
+    key: 'summary',
+    minWidth: 220,
+    ellipsis: { tooltip: true },
+    render: row => summaryText(row.summary),
+  },
   { title: '会话 ID', key: 'id', minWidth: 220, ellipsis: { tooltip: true } },
   { title: '消息数', key: 'messageCount', width: 90, align: 'center' },
+  { title: '摘要更新时间', key: 'summaryUpdatedAt', width: 180, render: row => formatDate(row.summaryUpdatedAt || '') },
   { title: '创建时间', key: 'createdAt', width: 180, render: row => formatDate(row.createdAt) },
   {
     title: '操作',
@@ -108,6 +124,34 @@ const columns: DataTableColumns<ConsultationSession> = [
 
 function formatDate(value: string) {
   return value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-';
+}
+
+function statusLabel(status?: string) {
+  const labels: Record<string, string> = {
+    active: '进行中',
+    resolved: '已总结',
+    stale: '已超时',
+    closed: '已关闭',
+  };
+  return labels[status || 'active'] || status || '进行中';
+}
+
+function statusTagType(status?: string) {
+  if (status === 'closed') return 'default';
+  if (status === 'stale') return 'warning';
+  if (status === 'resolved') return 'success';
+  return 'info';
+}
+
+function summaryText(summary: ConsultationSession['summary']) {
+  if (!summary) return '-';
+  const parts = [
+    summary.chiefComplaint || summary.lastTopic,
+    summary.symptoms?.length ? `症状：${summary.symptoms.join('、')}` : '',
+    summary.recommendedMedicines?.length ? `推荐：${summary.recommendedMedicines.join('、')}` : '',
+    summary.riskFlags?.length ? `风险：${summary.riskFlags.join('、')}` : '',
+  ].filter(Boolean);
+  return parts.join('；') || '-';
 }
 
 async function fetchSessions() {

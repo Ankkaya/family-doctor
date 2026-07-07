@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Headers, Param, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '@/auth/guards/permissions.guard';
@@ -7,6 +7,7 @@ import { AppJwtAuthGuard } from '@/domains/app-auth/guards/app-jwt-auth.guard';
 import { HouseholdsService } from '@/domains/households/households.service';
 import { AskConsultationDto } from './dto/ask-consultation.dto';
 import { QueryConsultationDto } from './dto/query-consultation.dto';
+import { RunConsultationDebugDto } from './dto/run-consultation-debug.dto';
 import { ConsultationService } from './consultation.service';
 
 type AppRequest = {
@@ -93,6 +94,19 @@ export class ConsultationController {
     return this.consultationService.findUserSession(id, current);
   }
 
+  @Patch('consultation/sessions/:id/close')
+  @UseGuards(AppJwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'App 关闭当前问诊会话' })
+  async closeUserSession(
+    @Req() req: AppRequest,
+    @Headers('x-household-id') requestedHouseholdId: string | undefined,
+    @Param('id') id: string,
+  ) {
+    const current = await this.householdsService.resolveCurrentHousehold(req.user.appUserId, requestedHouseholdId);
+    return this.consultationService.closeUserSession(id, current);
+  }
+
   @Get('admin/consultations')
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @RequirePermissions('family-doctor:consultation:view')
@@ -118,6 +132,15 @@ export class ConsultationController {
   @ApiOperation({ summary: '后台查看问诊 Agent Prompt 目录' })
   findPromptCatalog() {
     return this.consultationService.findPromptCatalog();
+  }
+
+  @Post('admin/consultations-debug/run')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @RequirePermissions('family-doctor:consultation:view')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '后台运行一次问诊 Agent 调试' })
+  runDebug(@Body() dto: RunConsultationDebugDto) {
+    return this.consultationService.runDebug(dto);
   }
 
   @Delete('admin/consultations/:id')

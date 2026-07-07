@@ -11,6 +11,7 @@ from .nodes.render import make_render_node
 from .nodes.review import make_review_node
 from .nodes.safety import make_safety_node
 from .nodes.special_population import make_special_population_node
+from .nodes.summarize import make_summarize_node
 from .state import GraphState
 
 
@@ -25,6 +26,7 @@ def build_graph(*, llm: LLMProvider, disclaimer: str):
     sg.add_node("review", make_review_node(llm))
     sg.add_node("safety", make_safety_node())
     sg.add_node("render", make_render_node(llm, disclaimer=disclaimer))
+    sg.add_node("summarize", make_summarize_node())
 
     sg.set_entry_point("preprocess")
     sg.add_edge("preprocess", "parse")
@@ -34,6 +36,7 @@ def build_graph(*, llm: LLMProvider, disclaimer: str):
     sg.add_edge("match", "review")
     sg.add_edge("review", "safety")
     sg.add_edge("safety", "render")
-    sg.add_edge("render", END)
+    sg.add_edge("render", "summarize")
+    sg.add_edge("summarize", END)
 
     return sg.compile()
