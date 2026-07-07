@@ -1,3 +1,5 @@
+import type { AGUIEvent, RunAgentInput } from '@ag-ui/core';
+
 export type AgentMedicineBrief = {
   id: string;
   name: string;
@@ -104,6 +106,10 @@ export type AgentConsultStreamEvent =
   | ({
       type: 'complete';
     } & AgentConsultOutput);
+
+export type AgentAgUiRunInput = RunAgentInput;
+
+export type AgentAgUiEvent = AGUIEvent;
 
 export type AgentRecognizeMedicineImageInput = {
   images: Array<{

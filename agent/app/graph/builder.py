@@ -15,7 +15,7 @@ from .nodes.summarize import make_summarize_node
 from .state import GraphState
 
 
-def build_graph(*, llm: LLMProvider, disclaimer: str):
+def build_graph(*, llm: LLMProvider, disclaimer: str, include_render: bool = True):
     """构建问药流程图：规则做安全，LLM 做理解和表达。"""
     sg = StateGraph(GraphState)
     sg.add_node("preprocess", make_preprocess_node())
@@ -25,8 +25,8 @@ def build_graph(*, llm: LLMProvider, disclaimer: str):
     sg.add_node("match", make_match_node())
     sg.add_node("review", make_review_node(llm))
     sg.add_node("safety", make_safety_node())
-    sg.add_node("render", make_render_node(llm, disclaimer=disclaimer))
-    sg.add_node("summarize", make_summarize_node())
+    if include_render:
+        sg.add_node("render", make_render_node(llm, disclaimer=disclaimer))
 
     sg.set_entry_point("preprocess")
     sg.add_edge("preprocess", "parse")
@@ -35,8 +35,10 @@ def build_graph(*, llm: LLMProvider, disclaimer: str):
     sg.add_edge("special_population", "match")
     sg.add_edge("match", "review")
     sg.add_edge("review", "safety")
-    sg.add_edge("safety", "render")
-    sg.add_edge("render", "summarize")
-    sg.add_edge("summarize", END)
+    if include_render:
+        sg.add_edge("safety", "render")
+        sg.add_edge("render", END)
+    else:
+        sg.add_edge("safety", END)
 
     return sg.compile()

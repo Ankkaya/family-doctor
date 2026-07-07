@@ -4,6 +4,22 @@
   "description": "Desktop-specific capability",
   "windows": ["main"],
   "platforms": ["linux", "macOS", "windows"],
-  "permissions": ["core:default"]
+  "permissions": [
+    "core:default",
+    {
+      "identifier": "http:default",
+      "allow": [
+        {
+          "url": "http://127.0.0.1:*"
+        },
+        {
+          "url": "http://localhost:*"
+        }
+      ]
+    },
+    "sql:default",
+    "sql:allow-execute",
+    "store:default"
+  ]
 }
 

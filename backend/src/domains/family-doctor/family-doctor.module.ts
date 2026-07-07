@@ -4,8 +4,9 @@ import { CabinetModule } from './cabinet/cabinet.module';
 import { ConsultationModule } from './consultation/consultation.module';
 import { MedicineModule } from './medicine/medicine.module';
 import { RemindersModule } from './reminders/reminders.module';
+import { VoiceModule } from './voice/voice.module';
 
 @Module({
-  imports: [AgentClientModule, MedicineModule, CabinetModule, ConsultationModule, RemindersModule],
+  imports: [AgentClientModule, MedicineModule, CabinetModule, VoiceModule, ConsultationModule, RemindersModule],
 })
 export class FamilyDoctorModule {}

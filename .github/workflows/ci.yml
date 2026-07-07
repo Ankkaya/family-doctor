@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  verify:
+    name: Build and Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install Node dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Agent dependencies
+        run: uv sync --project agent --all-extras
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Generate API contract
+        run: pnpm run api:generate
+
+      - name: Build backend
+        run: pnpm run build:backend
+
+      - name: Build admin frontend
+        run: pnpm run build:admin
+
+      - name: Build app frontend
+        run: pnpm run build:app
+
+      - name: Test backend
+        run: pnpm run test:backend
+
+      - name: Test frontend utility scripts
+        run: pnpm run test:admin-utils
+
+      - name: Test app frontend
+        run: pnpm run test:app
+
+      - name: Test generator
+        run: pnpm run test:generator
+
+      - name: Test Agent
+        run: pnpm run test:agent

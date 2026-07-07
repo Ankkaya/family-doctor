@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from collections.abc import Generator
+from collections.abc import Iterable
 import json
 from typing import TypeVar
 
@@ -47,8 +49,8 @@ SAMPLE_MEDICINES = [
 def _keyword_symptoms(text: str) -> list[str]:
     candidates = ["头痛", "头疼", "发热", "咳嗽", "咽痛", "腹泻", "恶心", "呕吐", "流涕", "鼻塞", "口腔溃疡"]
     symptoms = [kw for kw in candidates if kw in text]
-    if "头好疼" in text and "头疼" not in symptoms:
-        symptoms.append("头疼")
+    if not any(item in symptoms for item in ["头痛", "头疼"]) and "头" in text and ("疼" in text or "痛" in text):
+        symptoms.append("头痛")
     return symptoms
 
 
@@ -58,6 +60,11 @@ class FakeProvider:
 
     async def chat(self, *, system: str, user: str) -> str:  # noqa: ARG002
         return "测试模型回复：请结合症状休息观察，必要时就医。"
+
+    async def chat_stream(self, *, system: str, user: str) -> AsyncIterator[str]:  # noqa: ARG002
+        answer = await self.chat(system=system, user=user)
+        for index in range(0, len(answer), 8):
+            yield answer[index:index + 8]
 
     async def structured(self, *, system: str, user: str, schema: type[T]) -> T:  # noqa: ARG002
         if schema is ParsedSymptoms:
@@ -413,6 +420,72 @@ def test_consult_stream_reports_node_progress(client: TestClient) -> None:
     assert "".join(answer_deltas) == complete["answer"]
     assert complete["disclaimer"]
     assert len(complete["traces"]) >= 4
+
+
+def test_ag_ui_stream_reports_standard_events(client: TestClient) -> None:
+    with client.stream(
+        "POST",
+        "/agent/ag-ui",
+        headers={"Accept": "text/event-stream"},
+        json={
+            "threadId": "s-ag-ui",
+            "runId": "run-ag-ui",
+            "state": {},
+            "messages": [
+                {
+                    "id": "msg-user",
+                    "role": "user",
+                    "content": "这两天头痛发热，家里能吃什么药",
+                },
+            ],
+            "tools": [],
+            "context": [],
+            "forwardedProps": {
+                "sessionId": "s-ag-ui",
+                "messageId": "msg-assistant",
+                "medicines": SAMPLE_MEDICINES,
+            },
+        },
+    ) as response:
+        assert response.status_code == 200
+        events = _parse_sse_events(response.iter_lines())
+
+    event_types = [event["type"] for event in events]
+    assert "RUN_STARTED" in event_types
+    assert "TEXT_MESSAGE_START" in event_types
+    assert "TEXT_MESSAGE_CONTENT" in event_types
+    assert "TEXT_MESSAGE_END" in event_types
+    assert "STATE_DELTA" in event_types
+    assert event_types[-1] == "RUN_FINISHED"
+
+    answer = "".join(
+        event["delta"]
+        for event in events
+        if event["type"] == "TEXT_MESSAGE_CONTENT"
+    )
+    finished = events[-1]
+    assert finished["result"]["answer"] == answer
+    assert finished["result"]["messageId"] == "msg-assistant"
+    assert finished["result"]["recommends"]
+
+
+def _parse_sse_events(lines: Iterable[str]) -> list[dict[str, object]]:
+    events: list[dict[str, object]] = []
+    data_lines: list[str] = []
+
+    for line in lines:
+        if line.startswith("data:"):
+            data_lines.append(line.removeprefix("data:").strip())
+            continue
+
+        if line == "" and data_lines:
+            events.append(json.loads("\n".join(data_lines)))
+            data_lines = []
+
+    if data_lines:
+        events.append(json.loads("\n".join(data_lines)))
+
+    return events
 
 
 def test_recognize_medicine_images(client: TestClient) -> None:

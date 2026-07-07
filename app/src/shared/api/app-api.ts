@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { AGUIEvent, RunAgentInput } from "@ag-ui/core";
 import { httpClient } from "@/shared/api/http-client";
 import { isTauri } from "@/shared/lib/platform";
 import { appStore } from "@/shared/storage/app-store";
@@ -197,6 +198,10 @@ export type AskConsultationInput = {
   sessionId?: string;
   question: string;
   allowRxRecommendation?: boolean;
+  audio?: {
+    enabled?: boolean;
+    codec?: "mp3" | "wav";
+  };
 };
 
 export type ConsultationRecommend = {
@@ -240,9 +245,38 @@ export type AskConsultationStreamEvent =
       disclaimer: string;
     }
   | {
+      type: "audio_meta";
+      codec: "mp3" | "wav";
+      sampleRate: number;
+    }
+  | {
+      type: "audio_chunk";
+      seq: number;
+      text: string;
+      audioBase64: string;
+      codec: "mp3" | "wav";
+    }
+  | {
+      type: "audio_done";
+    }
+  | {
+      type: "audio_error";
+      message: string;
+    }
+  | {
       type: "error";
       message: string;
     };
+
+export type AgUiRunAgentInput = RunAgentInput;
+
+export type AgUiEvent = AGUIEvent;
+
+export type SpeechTranscriptionResult = {
+  text: string;
+  provider: "tencent";
+  durationMs?: number;
+};
 
 export type RecognizedMedicineResult = Medicine & {
   confidence?: number;
@@ -667,6 +701,19 @@ export const appApi = {
     onEvent: (event: AskConsultationStreamEvent) => void | Promise<void>,
   ) {
     return httpClient.postJsonStream<AskConsultationStreamEvent>("/consultation/ask/stream", input, onEvent);
+  },
+
+  async askAgUiStream(
+    input: AgUiRunAgentInput,
+    onEvent: (event: AgUiEvent) => void | Promise<void>,
+  ) {
+    return httpClient.runAgUiAgent(input, onEvent);
+  },
+
+  async transcribeAudio(file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+    return httpClient.postForm<SpeechTranscriptionResult>("/consultation/asr/transcribe", formData);
   },
 
   async recognizeMedicineImages(files: File[]) {
