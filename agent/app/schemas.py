@@ -127,6 +127,29 @@ class ConsultResponse(_CamelModel):
     traces: list[TraceStep]
 
 
+class IntentDecision(_CamelModel):
+    intent: Literal[
+        "create_reminder",
+        "modify_reminder",
+        "delete_reminder",
+        "list_reminder",
+        "medicine_consult",
+        "medicine_search",
+        "medicine_entry",
+        "profile_update",
+        "smalltalk",
+        "unsupported",
+    ]
+    confidence: float = Field(ge=0, le=1)
+    task_type: Literal["medicine", "temperature", "cabinet", "other"] = Field(
+        default="other",
+        alias="taskType",
+    )
+    needs_clarification: bool = Field(default=False, alias="needsClarification")
+    missing_fields: list[str] = Field(default_factory=list, alias="missingFields")
+    reason: str = ""
+
+
 class ImageInput(_CamelModel):
     filename: str
     mime_type: str = Field(alias="mimeType")

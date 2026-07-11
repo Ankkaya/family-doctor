@@ -29,23 +29,29 @@ from ..graph.nodes.render import (
     RENDER_SYSTEM,
     build_render_plan,
 )
-from ..schemas import ConsultRequest, ConsultResponse
+from ..schemas import ConsultRequest, ConsultResponse, IntentDecision
 from ..tools.cron_job_tool import (
     CronJobTool,
     build_idempotency_key,
     build_plan_from_text,
     confirmation_text,
     is_confirmation,
-    is_reminder_intent,
     is_supported_reminder,
     missing_fields_text,
 )
-from ..tracing import trace_node
+from ..tools.intent_router import (
+    LOW_CONFIDENCE_THRESHOLD,
+    classify_intent,
+    is_create_reminder,
+    route_summary,
+    should_run_consult_graph,
+)
 from ..tracing import trace_node
 
 router = APIRouter()
 
 NODE_STATUS_MESSAGES = {
+    "intent_router": "正在判断任务类型",
     "preprocess": "正在整理问题描述",
     "parse": "正在识别症状和持续时间",
     "emergency": "正在检查急症风险",
@@ -60,9 +66,9 @@ NODE_STATUS_MESSAGES = {
 
 @router.post("/consult", response_model=ConsultResponse, response_model_by_alias=True)
 async def consult(payload: ConsultRequest, request: Request) -> ConsultResponse:
-    reminder_response = await _try_handle_reminder(payload, request)
-    if reminder_response:
-        return reminder_response
+    intent, route_traces, routed_response = await _route_request(payload, request)
+    if routed_response:
+        return routed_response
 
     graph = request.app.state.graph
     result = await graph.ainvoke(
@@ -75,6 +81,7 @@ async def consult(payload: ConsultRequest, request: Request) -> ConsultResponse:
             "session_summary": payload.session_summary,
             "conversation_status": payload.conversation_status,
             "allow_rx_recommendation": payload.allow_rx_recommendation,
+            "intent_decision": intent,
             "traces": [],
         }
     )
@@ -83,32 +90,32 @@ async def consult(payload: ConsultRequest, request: Request) -> ConsultResponse:
         recommends=result["recommends"],
         disclaimer=result["disclaimer"],
         sessionSummary=result.get("updated_session_summary"),
-        traces=[trace for trace in result["traces"] if trace is not None],
+        traces=[trace for trace in [*route_traces, *result["traces"]] if trace is not None],
     )
 
 
 @router.post("/consult/stream")
 async def consult_stream(payload: ConsultRequest, request: Request) -> StreamingResponse:
-    reminder_response = await _try_handle_reminder(payload, request)
-    if reminder_response:
-        async def reminder_events() -> AsyncIterator[str]:
+    intent, route_traces, routed_response = await _route_request(payload, request)
+    if routed_response:
+        async def routed_events() -> AsyncIterator[str]:
             yield _to_ndjson(
                 {
                     "type": "status",
                     "stage": "agent",
-                    "message": "正在处理定时任务",
+                    "message": _status_for_routed_response(intent),
                 }
             )
-            for chunk in _iter_answer_chunks(reminder_response.answer):
+            for chunk in _iter_answer_chunks(routed_response.answer):
                 yield _to_ndjson({"type": "answer_delta", "delta": chunk})
             yield _to_ndjson(
                 {
                     "type": "complete",
-                    **reminder_response.model_dump(by_alias=True),
+                    **routed_response.model_dump(by_alias=True),
                 }
             )
 
-        return StreamingResponse(reminder_events(), media_type="application/x-ndjson")
+        return StreamingResponse(routed_events(), media_type="application/x-ndjson")
 
     graph = request.app.state.stream_graph
     llm = request.app.state.llm
@@ -124,6 +131,7 @@ async def consult_stream(payload: ConsultRequest, request: Request) -> Streaming
             "session_summary": payload.session_summary,
             "conversation_status": payload.conversation_status,
             "allow_rx_recommendation": payload.allow_rx_recommendation,
+            "intent_decision": intent,
             "traces": [],
         }
 
@@ -206,7 +214,7 @@ async def consult_stream(payload: ConsultRequest, request: Request) -> Streaming
             answer=answer,
             recommends=plan.recommends,
             disclaimer=settings.disclaimer,
-            traces=state["traces"],
+            traces=[trace for trace in [*route_traces, *state["traces"]] if trace is not None],
         )
         yield _to_ndjson(
             {
@@ -243,14 +251,14 @@ async def ag_ui(payload: RunAgentInput, request: Request) -> StreamingResponse:
                 )
             )
 
-            reminder_response = await _try_handle_reminder(consult_payload, request)
-            if reminder_response:
+            intent, route_traces, routed_response = await _route_request(consult_payload, request)
+            if routed_response:
                 message_id = _message_id(payload)
                 yield encoder.encode(
                     CustomEvent(
                         type=EventType.CUSTOM,
                         name="consultation.status",
-                        value={"stage": "agent", "message": "正在处理定时任务"},
+                        value={"stage": "agent", "message": _status_for_routed_response(intent)},
                     )
                 )
                 yield encoder.encode(
@@ -260,7 +268,7 @@ async def ag_ui(payload: RunAgentInput, request: Request) -> StreamingResponse:
                         role="assistant",
                     )
                 )
-                for chunk in _iter_answer_chunks(reminder_response.answer):
+                for chunk in _iter_answer_chunks(routed_response.answer):
                     yield encoder.encode(
                         TextMessageContentEvent(
                             type=EventType.TEXT_MESSAGE_CONTENT,
@@ -279,27 +287,21 @@ async def ag_ui(payload: RunAgentInput, request: Request) -> StreamingResponse:
                         type=EventType.STATE_DELTA,
                         delta=[
                             {"op": "replace", "path": "/messageId", "value": message_id},
-                            {"op": "replace", "path": "/answer", "value": reminder_response.answer},
+                            {"op": "replace", "path": "/answer", "value": routed_response.answer},
                             {
                                 "op": "replace",
                                 "path": "/recommends",
-                                "value": [
-                                    _dump_alias(item)
-                                    for item in reminder_response.recommends
-                                ],
+                                "value": [_dump_alias(item) for item in routed_response.recommends],
                             },
                             {
                                 "op": "replace",
                                 "path": "/disclaimer",
-                                "value": reminder_response.disclaimer,
+                                "value": routed_response.disclaimer,
                             },
                             {
                                 "op": "replace",
                                 "path": "/traces",
-                                "value": [
-                                    _dump_alias(item)
-                                    for item in reminder_response.traces
-                                ],
+                                "value": [_dump_alias(item) for item in routed_response.traces],
                             },
                         ],
                     )
@@ -312,16 +314,10 @@ async def ag_ui(payload: RunAgentInput, request: Request) -> StreamingResponse:
                         result={
                             "sessionId": consult_payload.session_id,
                             "messageId": message_id,
-                            "answer": reminder_response.answer,
-                            "recommends": [
-                                _dump_alias(item)
-                                for item in reminder_response.recommends
-                            ],
-                            "disclaimer": reminder_response.disclaimer,
-                            "traces": [
-                                _dump_alias(item)
-                                for item in reminder_response.traces
-                            ],
+                            "answer": routed_response.answer,
+                            "recommends": [_dump_alias(item) for item in routed_response.recommends],
+                            "disclaimer": routed_response.disclaimer,
+                            "traces": [_dump_alias(item) for item in routed_response.traces],
                         },
                     )
                 )
@@ -336,6 +332,7 @@ async def ag_ui(payload: RunAgentInput, request: Request) -> StreamingResponse:
                 "medicines": consult_payload.medicines,
                 "user_profile": consult_payload.user_profile,
                 "allow_rx_recommendation": consult_payload.allow_rx_recommendation,
+                "intent_decision": intent,
                 "traces": [],
             }
 
@@ -445,7 +442,7 @@ async def ag_ui(payload: RunAgentInput, request: Request) -> StreamingResponse:
             state.setdefault("traces", [])
             state["traces"].append(rec.step)
             recommends = [_dump_alias(item) for item in plan.recommends]
-            traces = [_dump_alias(item) for item in state["traces"] if item is not None]
+            traces = [_dump_alias(item) for item in [*route_traces, *state["traces"]] if item is not None]
 
             if active_step:
                 yield encoder.encode(
@@ -595,18 +592,98 @@ def _merge_state(state: dict[str, Any], update: dict[str, Any]) -> None:
         state[key] = value
 
 
-async def _try_handle_reminder(payload: ConsultRequest, request: Request) -> ConsultResponse | None:
+async def _route_request(
+    payload: ConsultRequest,
+    request: Request,
+) -> tuple[IntentDecision, list[Any], ConsultResponse | None]:
+    intent, intent_trace = await classify_intent(llm=request.app.state.llm, payload=payload)
+    route_traces = [intent_trace] if intent_trace is not None else []
+
+    reminder_response = await _try_handle_reminder(
+        payload,
+        request,
+        intent=intent,
+        prefix_traces=route_traces,
+    )
+    if reminder_response:
+        return intent, route_traces, reminder_response
+
+    if should_run_consult_graph(intent):
+        return intent, route_traces, None
+
+    return intent, route_traces, _non_consult_response(
+        intent=intent,
+        traces=route_traces,
+        disclaimer=request.app.state.settings.disclaimer,
+    )
+
+
+def _non_consult_response(
+    *,
+    intent: IntentDecision,
+    traces: list[Any],
+    disclaimer: str,
+) -> ConsultResponse:
+    if intent.intent in {"modify_reminder", "delete_reminder", "list_reminder"}:
+        answer = "我已识别到你想管理定时任务。当前对话里暂时只能创建新的家庭药箱提醒，已有提醒请到个人中心的定时任务中查看和管理。"
+        routed_disclaimer = "定时提醒仅用于辅助记录和提示，不替代医生或药师建议。"
+    elif intent.intent == "medicine_entry":
+        answer = "我已识别到你想录入药品。请使用药品录入入口上传药盒、说明书或手动填写药品信息。"
+        routed_disclaimer = disclaimer
+    elif intent.intent == "profile_update":
+        answer = "我已识别到你想更新个人或家庭成员资料。请到个人中心完善年龄、过敏史、基础病和长期用药等信息。"
+        routed_disclaimer = disclaimer
+    elif intent.intent == "smalltalk":
+        answer = "你好，我可以帮你做家庭药箱寻药咨询、药品录入识别和吃药/量体温/药箱维护提醒。"
+        routed_disclaimer = disclaimer
+    elif intent.confidence < LOW_CONFIDENCE_THRESHOLD or intent.needs_clarification:
+        missing = (
+            f"还需要补充：{'、'.join(intent.missing_fields)}。"
+            if intent.missing_fields
+            else "请再补充一点目标或时间。"
+        )
+        answer = f"我还不确定要执行哪类任务。{missing}"
+        routed_disclaimer = disclaimer
+    else:
+        answer = "这个需求暂时超出家庭药箱 Agent 的处理范围。你可以问我家庭药箱寻药、药品信息、用药安全或设置家庭健康提醒。"
+        routed_disclaimer = disclaimer
+
+    return ConsultResponse(
+        answer=answer,
+        recommends=[],
+        disclaimer=routed_disclaimer,
+        traces=[trace for trace in traces if trace is not None],
+    )
+
+
+def _status_for_routed_response(intent: IntentDecision) -> str:
+    if intent.intent.endswith("reminder") or intent.intent in {
+        "modify_reminder",
+        "delete_reminder",
+        "list_reminder",
+    }:
+        return "正在处理定时任务"
+    return NODE_STATUS_MESSAGES["intent_router"]
+
+
+async def _try_handle_reminder(
+    payload: ConsultRequest,
+    request: Request,
+    *,
+    intent: IntentDecision | None = None,
+    prefix_traces: list[Any] | None = None,
+) -> ConsultResponse | None:
     question = payload.question.strip()
     previous_confirmation = _find_previous_confirmation(payload)
     if is_confirmation(question) and previous_confirmation:
         answer = ""
-        traces: list[Any] = []
         with trace_node(
             "cron_job_execute",
             {
                 "question": question,
                 "previousConfirmation": previous_confirmation,
                 "sessionId": payload.session_id,
+                "intent": route_summary(intent) if intent else None,
             },
         ) as rec:
             plan = build_plan_from_text(
@@ -641,15 +718,13 @@ async def _try_handle_reminder(payload: ConsultRequest, request: Request) -> Con
                 else:
                     rec.set_output({"created": True, "jobId": result.get("id"), "taskType": plan.task_type})
                     answer = f"已设置：{result.get('title', plan.title)}。你可以在个人中心的定时任务中查看和管理。"
-            pass
-        traces = [rec.step]
+        traces = [*(prefix_traces or []), rec.step]
         return _reminder_response(answer=answer, traces=traces)
 
-    if not is_reminder_intent(question, payload.medicines):
+    if intent is None or not is_create_reminder(intent):
         return None
 
     answer = ""
-    traces: list[Any] = []
     with trace_node(
         "cron_job_plan",
         {
@@ -657,6 +732,7 @@ async def _try_handle_reminder(payload: ConsultRequest, request: Request) -> Con
             "sessionId": payload.session_id,
             "medicineCount": len(payload.medicines),
             "memberCount": len(payload.members),
+            "intent": route_summary(intent) if intent else None,
         },
     ) as rec:
         if not is_supported_reminder(question, payload.medicines):
@@ -690,8 +766,7 @@ async def _try_handle_reminder(payload: ConsultRequest, request: Request) -> Con
                         "everySeconds": plan.every_seconds,
                     }
                 )
-        pass
-    traces = [rec.step]
+    traces = [*(prefix_traces or []), rec.step]
     return _reminder_response(answer=answer, traces=traces)
 
 

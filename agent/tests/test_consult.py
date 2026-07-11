@@ -12,7 +12,12 @@ from pydantic import BaseModel
 
 from app.config import get_settings
 from app import main as main_module
-from app.schemas import ParsedSymptoms, RecognizeMedicineImagesResponse, RiskReviewOutput
+from app.schemas import (
+    IntentDecision,
+    ParsedSymptoms,
+    RecognizeMedicineImagesResponse,
+    RiskReviewOutput,
+)
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -67,6 +72,44 @@ class FakeProvider:
             yield answer[index:index + 8]
 
     async def structured(self, *, system: str, user: str, schema: type[T]) -> T:  # noqa: ARG002
+        if schema is IntentDecision:
+            if any(keyword in user for keyword in ("提醒", "定时", "每隔", "每周", "闹钟")):
+                task_type = "medicine"
+                if any(keyword in user for keyword in ("体温", "量温", "测温", "发烧")):
+                    task_type = "temperature"
+                elif any(keyword in user for keyword in ("药箱", "过期", "库存", "补药", "缺药")):
+                    task_type = "cabinet"
+                return schema.model_validate(
+                    {
+                        "intent": "create_reminder",
+                        "confidence": 0.92,
+                        "taskType": task_type,
+                        "needsClarification": False,
+                        "missingFields": [],
+                        "reason": "测试模型识别为创建提醒",
+                    }
+                )
+            if any(keyword in user for keyword in ("药店", "哪里买", "购买", "价格")):
+                return schema.model_validate(
+                    {
+                        "intent": "unsupported",
+                        "confidence": 0.9,
+                        "taskType": "other",
+                        "needsClarification": False,
+                        "missingFields": [],
+                        "reason": "测试模型识别为超出范围",
+                    }
+                )
+            return schema.model_validate(
+                {
+                    "intent": "medicine_consult",
+                    "confidence": 0.9,
+                    "taskType": "other",
+                    "needsClarification": False,
+                    "missingFields": [],
+                    "reason": "测试模型默认进入问药流程",
+                }
+            )
         if schema is ParsedSymptoms:
             emergency = any(keyword in user for keyword in EMERGENCY_KEYWORDS)
             return schema.model_validate(
@@ -383,6 +426,40 @@ def test_consult_emergency(client: TestClient) -> None:
     body = r.json()
     assert body["recommends"] == []
     assert "120" in body["answer"] or "急诊" in body["answer"]
+
+
+def test_router_keeps_medicine_question_out_of_reminder_flow(client: TestClient) -> None:
+    r = client.post(
+        "/agent/consult",
+        json={
+            "sessionId": "s-router-medicine",
+            "question": "布洛芬缓释胶囊怎么吃",
+            "medicines": SAMPLE_MEDICINES,
+        },
+    )
+    assert r.status_code == 200
+    trace_names = [trace["nodeName"] for trace in r.json()["traces"]]
+    assert "intent_router" in trace_names
+    assert "cron_job_plan" not in trace_names
+    assert "parse" in trace_names
+
+
+def test_router_sends_explicit_reminder_to_cron_planner(client: TestClient) -> None:
+    r = client.post(
+        "/agent/consult",
+        json={
+            "sessionId": "s-router-reminder",
+            "question": "明天早上提醒我吃布洛芬缓释胶囊",
+            "medicines": SAMPLE_MEDICINES,
+            "now": "2026-07-07T08:00:00+08:00",
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    trace_names = [trace["nodeName"] for trace in body["traces"]]
+    assert trace_names[:2] == ["intent_router", "cron_job_plan"]
+    assert body["recommends"] == []
+    assert "请确认" in body["answer"]
 
 
 def test_consult_stream_reports_node_progress(client: TestClient) -> None:
