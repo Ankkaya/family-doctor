@@ -63,6 +63,7 @@ function validateRuntimeEnv(): void {
   assertRequiredEnv('MINIO_ACCESS_KEY');
   assertRequiredEnv('MINIO_SECRET_KEY');
   assertRequiredEnv('CORS_ORIGINS');
+  assertSafeSecret('AGENT_INTERNAL_TOKEN');
   assertSafeSecret('JWT_SECRET');
   assertSafeSecret('JWT_REFRESH_SECRET');
 }

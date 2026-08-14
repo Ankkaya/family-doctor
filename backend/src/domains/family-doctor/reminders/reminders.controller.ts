@@ -149,7 +149,7 @@ export class RemindersController {
 
   private assertAgentToken(token?: string) {
     const expected = process.env.AGENT_INTERNAL_TOKEN;
-    if (expected && token !== expected) {
+    if (!expected || token !== expected) {
       throw new ForbiddenException('Agent token 无效');
     }
   }

@@ -1,7 +1,8 @@
-import { BadRequestException, Body, Controller, Patch, Post, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Ip, Patch, Post, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { BufferedFile } from '@/infrastructure/minio/dto/file.dto';
+import { RateLimitService } from '@/infrastructure/redis/rate-limit.service';
 import { AppJwtAuthGuard } from './guards/app-jwt-auth.guard';
 import { AppAuthService } from './app-auth.service';
 import { LoginAppUserDto } from './dto/login-app-user.dto';
@@ -26,30 +27,45 @@ export class AppAuthController {
     'image/avif',
   ]);
 
-  constructor(private readonly appAuthService: AppAuthService) {}
+  constructor(
+    private readonly appAuthService: AppAuthService,
+    private readonly rateLimit: RateLimitService,
+  ) {}
 
   @Post('anonymous')
   @ApiOperation({ summary: 'App 创建匿名身份和默认家庭' })
-  createAnonymousIdentity() {
+  async createAnonymousIdentity(@Ip() ip: string) {
+    await this.rateLimit.assertWithinLimit('app-anonymous', ip, 5, 3600);
     return this.appAuthService.createAnonymousIdentity();
   }
 
   @Post('register')
   @ApiOperation({ summary: 'App 用户名密码注册，需系统注册码' })
-  register(@Body() dto: RegisterAppUserDto) {
+  async register(@Ip() ip: string, @Body() dto: RegisterAppUserDto) {
+    await this.rateLimit.assertWithinLimit('app-register', ip, 5, 3600);
     return this.appAuthService.register(dto);
   }
 
   @Post('login')
   @ApiOperation({ summary: 'App 用户名密码登录' })
-  login(@Body() dto: LoginAppUserDto) {
+  async login(@Ip() ip: string, @Body() dto: LoginAppUserDto) {
+    await this.rateLimit.assertWithinLimit('app-login', `${ip}:${dto.username.trim().toLowerCase()}`, 10, 900);
     return this.appAuthService.login(dto);
   }
 
   @Post('refresh')
   @ApiOperation({ summary: 'App 刷新访问令牌' })
-  refresh(@Body() dto: RefreshAppTokenDto) {
+  async refresh(@Ip() ip: string, @Body() dto: RefreshAppTokenDto) {
+    await this.rateLimit.assertWithinLimit('app-refresh', ip, 30, 300);
     return this.appAuthService.refresh(dto.refreshToken);
+  }
+
+  @Post('logout')
+  @ApiBearerAuth()
+  @UseGuards(AppJwtAuthGuard)
+  @ApiOperation({ summary: 'App 注销当前会话' })
+  logout(@Req() req: AppRequest) {
+    return this.appAuthService.logout(req.user.appUserId);
   }
 
   @Patch('profile')
@@ -77,7 +93,7 @@ export class AppAuthController {
       },
     },
   })
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }))
   uploadAvatar(
     @Req() req: AppRequest,
     @UploadedFile() file: BufferedFile,
@@ -93,6 +109,9 @@ export class AppAuthController {
 
     if (!AppAuthController.ALLOWED_AVATAR_TYPES.has(file.mimetype)) {
       throw new BadRequestException('头像仅支持 JPG、PNG、WEBP、GIF、AVIF 格式');
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      throw new BadRequestException('头像图片不能超过 5MB');
     }
   }
 }

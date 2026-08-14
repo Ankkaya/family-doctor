@@ -13,8 +13,9 @@ services:
 
   agent:
     container_name: family-doctor-prod-agent
-    ports: !override
-      - "8000:8000"
+    environment:
+      AGENT_INTERNAL_TOKEN: ${AGENT_INTERNAL_TOKEN:?正式环境必须设置 AGENT_INTERNAL_TOKEN}
+    ports: !override []
 
   backend:
     container_name: family-doctor-prod-backend
@@ -29,6 +30,7 @@ services:
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?正式环境必须设置 MINIO_SECRET_KEY}
       ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
       CORS_ORIGINS: ${CORS_ORIGINS:?正式环境必须设置 CORS_ORIGINS}
+      AGENT_INTERNAL_TOKEN: ${AGENT_INTERNAL_TOKEN:?正式环境必须设置 AGENT_INTERNAL_TOKEN}
     restart: always
     ports: !override
       - "3001:3001"
@@ -58,13 +60,11 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?正式环境必须设置 MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?正式环境必须设置 MINIO_ROOT_PASSWORD}
     # 正式环境不暴露 MinIO 控制台到外部
-    ports: !override
-      - "9000:9000"
+    ports: !override []
     restart: always
 
   redis:
     container_name: family-doctor-prod-redis
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD:?正式环境必须设置 REDIS_PASSWORD}
-    ports: !override
-      - "6379:6379"
+    ports: !override []

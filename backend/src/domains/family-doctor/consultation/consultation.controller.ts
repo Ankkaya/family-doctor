@@ -5,6 +5,7 @@ import { PermissionsGuard } from '@/auth/guards/permissions.guard';
 import { RequirePermissions } from '@/auth/decorators/permissions.decorator';
 import { AppJwtAuthGuard } from '@/domains/app-auth/guards/app-jwt-auth.guard';
 import { HouseholdsService } from '@/domains/households/households.service';
+import { RateLimitService } from '@/infrastructure/redis/rate-limit.service';
 import { AgentAgUiRunInput } from '../agent-client/agent-client.types';
 import { AgUiRunAgentDto } from './dto/ag-ui-run-agent.dto';
 import { AskConsultationDto } from './dto/ask-consultation.dto';
@@ -24,6 +25,7 @@ export class ConsultationController {
   constructor(
     private readonly consultationService: ConsultationService,
     private readonly householdsService: HouseholdsService,
+    private readonly rateLimit: RateLimitService,
   ) {}
 
   @Post('consultation/ask')
@@ -80,6 +82,7 @@ export class ConsultationController {
     @Body() dto: AgUiRunAgentDto,
     @Res() res: any,
   ) {
+    await this.rateLimit.assertWithinLimit('consultation', req.user.appUserId, 20, 600);
     const current = await this.householdsService.resolveCurrentHousehold(req.user.appUserId, requestedHouseholdId);
 
     res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
@@ -118,6 +121,7 @@ export class ConsultationController {
     @Headers('x-household-id') requestedHouseholdId: string | undefined,
     @Query() query: QueryConsultationDto,
   ) {
+    await this.rateLimit.assertWithinLimit('consultation', req.user.appUserId, 20, 600);
     const current = await this.householdsService.resolveCurrentHousehold(req.user.appUserId, requestedHouseholdId);
     return this.consultationService.findUserSessions(query, current);
   }
@@ -131,6 +135,7 @@ export class ConsultationController {
     @Headers('x-household-id') requestedHouseholdId: string | undefined,
     @Param('id') id: string,
   ) {
+    await this.rateLimit.assertWithinLimit('consultation', req.user.appUserId, 20, 600);
     const current = await this.householdsService.resolveCurrentHousehold(req.user.appUserId, requestedHouseholdId);
     return this.consultationService.findUserSession(id, current);
   }

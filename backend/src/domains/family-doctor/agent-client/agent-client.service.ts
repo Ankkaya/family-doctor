@@ -21,6 +21,19 @@ export class AgentClientService {
     return Number(process.env.AGENT_TIMEOUT_MS || 30000);
   }
 
+  private getHeaders(accept?: string) {
+    const token = process.env.AGENT_INTERNAL_TOKEN;
+    if (!token) {
+      throw new BadGatewayException('Agent 内部认证未配置');
+    }
+
+    return {
+      'Content-Type': 'application/json',
+      ...(accept ? { Accept: accept } : {}),
+      'X-Agent-Token': token,
+    };
+  }
+
   private getErrorMessage(error: unknown, timeoutMs: number) {
     if (error instanceof Error && error.name === 'AbortError') {
       return `Agent 调用超时（${timeoutMs}ms）`;
@@ -38,9 +51,7 @@ export class AgentClientService {
     try {
       const response = await fetch(`${baseUrl}/agent/consult`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: this.getHeaders(),
         body: JSON.stringify(input),
         signal: controller.signal,
       });
@@ -73,9 +84,7 @@ export class AgentClientService {
     try {
       const response = await fetch(`${baseUrl}/agent/medicine/recognize-images`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: this.getHeaders(),
         body: JSON.stringify(input),
         signal: controller.signal,
       });
@@ -130,10 +139,7 @@ export class AgentClientService {
     try {
       const response = await fetch(`${baseUrl}/agent/ag-ui`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'text/event-stream',
-        },
+        headers: this.getHeaders('text/event-stream'),
         body: JSON.stringify(input),
         signal: controller.signal,
       });
@@ -212,10 +218,7 @@ export class AgentClientService {
     try {
       const response = await fetch(`${baseUrl}/agent/consult/stream`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/x-ndjson',
-        },
+        headers: this.getHeaders('application/x-ndjson'),
         body: JSON.stringify(input),
         signal: controller.signal,
       });

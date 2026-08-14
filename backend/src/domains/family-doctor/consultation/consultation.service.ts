@@ -7,13 +7,15 @@ import { AgentClientService } from '../agent-client/agent-client.service';
 import {
   AgentAgUiEvent,
   AgentAgUiRunInput,
+  AgentHistoryMessage,
+  AgentSessionSummary,
   AgentTraceStep,
   AgentUserProfile,
   AgentRecommend,
 } from '../agent-client/agent-client.types';
 import { CabinetService } from '../cabinet/cabinet.service';
 import { CurrentHousehold, HouseholdsService } from '@/domains/households/households.service';
-import { TencentTtsService } from '../voice/tencent-tts.service';
+import { ConsultationAudioStreamerService } from './consultation-audio-streamer.service';
 import { AskConsultationDto } from './dto/ask-consultation.dto';
 import { QueryConsultationDto } from './dto/query-consultation.dto';
 import { RunConsultationDebugDto } from './dto/run-consultation-debug.dto';
@@ -28,7 +30,6 @@ type SessionRow = {
   id: string;
   userId: string | null;
   householdId: string | null;
-  devUserId: string | null;
   householdName?: string | null;
   userNickname?: string | null;
   userPhone?: string | null;
@@ -194,7 +195,6 @@ function normalizeStreamStage(stage?: string): ConsultationStreamStage {
 
   return 'agent';
 }
-
 @Injectable()
 export class ConsultationService {
   constructor(
@@ -202,7 +202,7 @@ export class ConsultationService {
     private readonly cabinetService: CabinetService,
     private readonly agentClient: AgentClientService,
     private readonly householdsService: HouseholdsService,
-    private readonly ttsService: TencentTtsService,
+    private readonly audioStreamerService: ConsultationAudioStreamerService,
   ) {}
 
   async ask(dto: AskConsultationDto, current: CurrentHousehold) {
@@ -276,7 +276,7 @@ export class ConsultationService {
     const assistantMessageId = randomUUID();
     const title = this.buildSessionTitle(question);
     const audioStreamer = dto.audio?.enabled === true
-      ? this.createAudioStreamer(dto.audio?.codec || 'mp3', onEvent)
+      ? this.audioStreamerService.createStandard(dto.audio?.codec || 'mp3', onEvent)
       : null;
 
     if (dto.sessionId?.trim()) {
@@ -375,7 +375,7 @@ export class ConsultationService {
     const assistantMessageId = randomUUID();
     const title = this.buildSessionTitle(question);
     const audioStreamer = dto.audio?.enabled === true
-      ? this.createAgUiAudioStreamer(dto.audio?.codec || 'mp3', onEvent)
+      ? this.audioStreamerService.createAgUi(dto.audio?.codec || 'mp3', onEvent)
       : null;
 
     if (dto.sessionId?.trim()) {
@@ -595,7 +595,6 @@ export class ConsultationService {
           s.id,
           s.user_id as "userId",
           s.household_id as "householdId",
-          s.dev_user_id as "devUserId",
           h.name as "householdName",
           u.nickname as "userNickname",
           u.phone as "userPhone",
@@ -647,7 +646,6 @@ export class ConsultationService {
         s.id,
         s.user_id as "userId",
         s.household_id as "householdId",
-        s.dev_user_id as "devUserId",
         h.name as "householdName",
         u.nickname as "userNickname",
         u.phone as "userPhone",
@@ -747,8 +745,8 @@ export class ConsultationService {
 
   private async ensureSession(sessionId: string, title: string, current: CurrentHousehold) {
     await this.prisma.$executeRaw(Prisma.sql`
-      INSERT INTO consultation_session (id, user_id, household_id, dev_user_id, title)
-      VALUES (${sessionId}, ${current.appUserId}, ${current.householdId}, NULL, ${title})
+      INSERT INTO consultation_session (id, user_id, household_id, title)
+      VALUES (${sessionId}, ${current.appUserId}, ${current.householdId}, ${title})
       ON CONFLICT (id) DO NOTHING
     `);
   }
@@ -1016,6 +1014,9 @@ export class ConsultationService {
     if (!question || question.trim().length < 2) {
       throw new BadRequestException('AG-UI 输入缺少有效用户问题');
     }
+    if (question.length > 2000) {
+      throw new BadRequestException('用户问题不能超过 2000 个字符');
+    }
 
     const sessionId = this.pickString(input.forwardedProps?.sessionId)
       || this.pickString(input.state?.sessionId);
@@ -1091,166 +1092,151 @@ export class ConsultationService {
     return EMPTY_PROFILE_VALUES.has(compact) ? null : normalized;
   }
 
-  private createAudioStreamer(
-    codec: 'mp3' | 'wav',
-    onEvent: (event: ConsultationStreamEvent) => Promise<void> | void,
-  ) {
-    let pendingText = '';
-    let sequence = 0;
-    let metadataSent = false;
-    let chain = Promise.resolve();
-    let failed = false;
-
-    const enqueue = (text: string) => {
-      const normalized = text.replace(/\s+/g, ' ').trim();
-      if (!normalized || failed) return;
-
-      chain = chain.then(async () => {
-        try {
-          const audio = await this.ttsService.synthesize({ text: normalized, codec });
-          if (!audio.audioBase64) return;
-
-          if (!metadataSent) {
-            metadataSent = true;
-            await onEvent({
-              type: 'audio_meta',
-              codec: audio.codec,
-              sampleRate: audio.sampleRate,
-            });
-          }
-
-          sequence += 1;
-          await onEvent({
-            type: 'audio_chunk',
-            seq: sequence,
-            text: normalized,
-            audioBase64: audio.audioBase64,
-            codec: audio.codec,
-          });
-        } catch (error) {
-          failed = true;
-          await onEvent({
-            type: 'audio_error',
-            message: error instanceof Error ? error.message : '语音合成失败',
-          });
-        }
-      });
-    };
-
-    return {
-      push: (delta: string) => {
-        pendingText += delta;
-        const { ready, rest } = this.extractSpeakableSentences(pendingText);
-        pendingText = rest;
-        ready.forEach(enqueue);
-      },
-      finish: async () => {
-        const rest = pendingText.trim();
-        pendingText = '';
-        if (rest) {
-          enqueue(rest);
-        }
-        await chain;
-        if (!failed && metadataSent) {
-          await onEvent({ type: 'audio_done' });
-        }
-      },
-    };
-  }
-
-  private createAgUiAudioStreamer(
-    codec: 'mp3' | 'wav',
-    onEvent: (event: AgentAgUiEvent) => Promise<void> | void,
-  ) {
-    let pendingText = '';
-    let sequence = 0;
-    let metadataSent = false;
-    let chain = Promise.resolve();
-    let failed = false;
-
-    const emitCustom = (name: string, value: Record<string, unknown>) => onEvent({
-      type: EventType.CUSTOM,
-      name,
-      value,
-    });
-
-    const enqueue = (text: string) => {
-      const normalized = text.replace(/\s+/g, ' ').trim();
-      if (!normalized || failed) return;
-
-      chain = chain.then(async () => {
-        try {
-          const audio = await this.ttsService.synthesize({ text: normalized, codec });
-          if (!audio.audioBase64) return;
-
-          if (!metadataSent) {
-            metadataSent = true;
-            await emitCustom('consultation.audio_meta', {
-              type: 'audio_meta',
-              codec: audio.codec,
-              sampleRate: audio.sampleRate,
-            });
-          }
-
-          sequence += 1;
-          await emitCustom('consultation.audio_chunk', {
-            type: 'audio_chunk',
-            seq: sequence,
-            text: normalized,
-            audioBase64: audio.audioBase64,
-            codec: audio.codec,
-          });
-        } catch (error) {
-          failed = true;
-          await emitCustom('consultation.audio_error', {
-            type: 'audio_error',
-            message: error instanceof Error ? error.message : '语音合成失败',
-          });
-        }
-      });
-    };
-
-    return {
-      push: (delta: string) => {
-        pendingText += delta;
-        const { ready, rest } = this.extractSpeakableSentences(pendingText);
-        pendingText = rest;
-        ready.forEach(enqueue);
-      },
-      finish: async () => {
-        const rest = pendingText.trim();
-        pendingText = '';
-        if (rest) {
-          enqueue(rest);
-        }
-        await chain;
-        if (!failed && metadataSent) {
-          await emitCustom('consultation.audio_done', { type: 'audio_done' });
-        }
-      },
-    };
-  }
-
-  private extractSpeakableSentences(text: string) {
-    const ready: string[] = [];
-    let start = 0;
-
-    for (let index = 0; index < text.length; index += 1) {
-      const char = text[index];
-      const sentenceLength = index - start + 1;
-      if (/[。！？!?；;]/.test(char) || sentenceLength >= 80) {
-        const sentence = text.slice(start, index + 1).trim();
-        if (sentence) {
-          ready.push(sentence);
-        }
-        start = index + 1;
-      }
+  private normalizeSessionStatus(value?: string | null): ConsultationSessionStatus {
+    if (value === 'resolved' || value === 'stale' || value === 'closed') {
+      return value;
     }
 
+    return 'active';
+  }
+
+  private normalizeSessionSummary(value?: unknown | null): AgentSessionSummary | null {
+    if (!value || typeof value !== 'object') {
+      return null;
+    }
+
+    const summary = value as Partial<AgentSessionSummary>;
     return {
-      ready,
-      rest: text.slice(start),
+      chiefComplaint: this.pickString(summary.chiefComplaint),
+      symptoms: this.pickStringList(summary.symptoms),
+      duration: this.pickString(summary.duration),
+      riskFlags: this.pickStringList(summary.riskFlags),
+      mentionedMedicines: this.pickStringList(summary.mentionedMedicines),
+      rejectedMedicines: this.pickStringList(summary.rejectedMedicines),
+      recommendedMedicines: this.pickStringList(summary.recommendedMedicines),
+      temporaryUserFacts: this.pickStringList(summary.temporaryUserFacts),
+      unresolvedQuestions: this.pickStringList(summary.unresolvedQuestions),
+      lastTopic: this.pickString(summary.lastTopic),
+      suggestedStatus: this.normalizeSessionStatus(summary.suggestedStatus),
     };
+  }
+
+  private normalizeDebugHistoryMessages(value?: unknown): AgentHistoryMessage[] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value
+      .map((item) => {
+        if (!item || typeof item !== 'object') {
+          return null;
+        }
+        const message = item as Partial<AgentHistoryMessage>;
+        const role = message.role === 'ASSISTANT' ? 'ASSISTANT' : 'USER';
+        const content = this.pickString(message.content);
+        if (!content) {
+          return null;
+        }
+        return {
+          role,
+          content,
+          createdAt: this.pickString(message.createdAt) ?? new Date().toISOString(),
+        };
+      })
+      .filter((item): item is AgentHistoryMessage => item !== null)
+      .slice(-RECENT_HISTORY_MESSAGE_LIMIT);
+  }
+
+  private deriveNextStatus(
+    summary: AgentSessionSummary | null | undefined,
+    fallback: ConsultationSessionStatus,
+  ): ConsultationSessionStatus {
+    if (fallback === 'closed') {
+      return 'closed';
+    }
+
+    if (!summary?.suggestedStatus) {
+      return fallback === 'stale' ? 'active' : fallback;
+    }
+
+    const nextStatus = this.normalizeSessionStatus(summary.suggestedStatus);
+    return nextStatus === 'closed' ? 'resolved' : nextStatus;
+  }
+
+  private buildMedicineLookupQuery(question: string, summary: AgentSessionSummary | null) {
+    const parts = [
+      question,
+      summary?.chiefComplaint,
+      summary?.lastTopic,
+      ...(summary?.symptoms ?? []),
+      ...(summary?.mentionedMedicines ?? []),
+    ];
+    return parts.filter((item): item is string => Boolean(item?.trim())).join(' ').slice(0, 240);
+  }
+
+  private isSessionStale(messages: MessageRow[]) {
+    const latest = messages[messages.length - 1];
+    if (!latest) {
+      return false;
+    }
+
+    return Date.now() - this.toTimestamp(latest.createdAt) > STALE_SESSION_MS;
+  }
+
+  private isLikelyFollowUp(question: string) {
+    const compact = question.replace(/\s+/g, '');
+    return /这个|那个|这药|该药|刚才|上面|前面|继续|还能|还可以|能不能|怎么吃|饭前|饭后|多久|剂量|用量|它|副作用|禁忌|可以吃吗/.test(compact);
+  }
+
+  private isLikelyNewTopic(question: string, summary: AgentSessionSummary | null) {
+    const compact = question.replace(/\s+/g, '');
+    if (/另外|换个问题|另一个问题|我妈|我爸|孩子|小孩|老人|家人/.test(compact)) {
+      return true;
+    }
+
+    const previousSymptoms = new Set(summary?.symptoms ?? []);
+    if (previousSymptoms.size === 0) {
+      return false;
+    }
+
+    const currentSymptoms = this.extractSymptomHints(compact);
+    if (currentSymptoms.length === 0) {
+      return false;
+    }
+
+    return currentSymptoms.every((symptom) => !previousSymptoms.has(symptom));
+  }
+
+  private extractSymptomHints(text: string) {
+    const knownSymptoms = [
+      '头痛',
+      '头疼',
+      '发热',
+      '发烧',
+      '咳嗽',
+      '咽痛',
+      '嗓子疼',
+      '腹泻',
+      '拉肚子',
+      '恶心',
+      '呕吐',
+      '流涕',
+      '鼻塞',
+      '胃痛',
+      '胃疼',
+      '牙痛',
+      '口腔溃疡',
+      '皮疹',
+      '胸痛',
+    ];
+
+    return knownSymptoms.filter((symptom) => text.includes(symptom));
+  }
+
+  private pickStringList(value: unknown) {
+    return Array.isArray(value)
+      ? value.filter((item): item is string => typeof item === 'string' && Boolean(item.trim())).map((item) => item.trim())
+      : [];
   }
 
   private buildTraceDetail(trace: TraceRow): TraceDetailRow {
@@ -1344,4 +1330,3 @@ export class ConsultationService {
     return new Date(value).toISOString();
   }
 }
- 

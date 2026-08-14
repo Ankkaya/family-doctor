@@ -79,6 +79,7 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:${FD_FRONTEND_PORT:-18080},http://localhost:5173,http://localhost:1420}
       AGENT_BASE_URL: http://agent:8000
       AGENT_TIMEOUT_MS: 30000
+      AGENT_INTERNAL_TOKEN: ${AGENT_INTERNAL_TOKEN:-dev-only-agent-token-change-before-production}
       MINIO_ENDPOINT: minio
       MINIO_PORT: 9000
       MINIO_USE_SSL: false
@@ -108,6 +109,7 @@ services:
       APP_HOST: 0.0.0.0
       APP_PORT: 8000
       APP_LOG_LEVEL: info
+      AGENT_INTERNAL_TOKEN: ${AGENT_INTERNAL_TOKEN:-dev-only-agent-token-change-before-production}
     ports:
       - "${FD_AGENT_PORT:-18000}:8000"
 

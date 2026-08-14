@@ -6,6 +6,7 @@ import { PermissionsGuard } from '@/auth/guards/permissions.guard';
 import { RequirePermissions } from '@/auth/decorators/permissions.decorator';
 import { BufferedFile } from '@/infrastructure/minio/dto/file.dto';
 import { AppJwtAuthGuard } from '@/domains/app-auth/guards/app-jwt-auth.guard';
+import { RateLimitService } from '@/infrastructure/redis/rate-limit.service';
 import { QueryMedicineDto } from './dto/query-medicine.dto';
 import { UpsertMedicineDto } from './dto/upsert-medicine.dto';
 import { MedicineService } from './medicine.service';
@@ -27,7 +28,10 @@ export class MedicineController {
     'image/avif',
   ]);
 
-  constructor(private readonly medicineService: MedicineService) {}
+  constructor(
+    private readonly medicineService: MedicineService,
+    private readonly rateLimit: RateLimitService,
+  ) {}
 
   @Get('medicine/catalog')
   @ApiOperation({ summary: 'App 查询药品目录' })
@@ -45,11 +49,12 @@ export class MedicineController {
   @UseGuards(AppJwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'App 识别药盒图片并提取药品信息' })
-  @UseInterceptors(FilesInterceptor('files', 4))
-  recognizeImages(
-    @Req() _req: AppRequest,
+  @UseInterceptors(FilesInterceptor('files', 4, { limits: { fileSize: 8 * 1024 * 1024 } }))
+  async recognizeImages(
+    @Req() req: AppRequest,
     @UploadedFiles() files: BufferedFile[],
   ) {
+    await this.rateLimit.assertWithinLimit('medicine-recognition', req.user.appUserId, 10, 3600);
     this.validateRecognitionFiles(files);
     return this.medicineService.recognizeFromImages(files);
   }
@@ -98,6 +103,9 @@ export class MedicineController {
     files.forEach((file) => {
       if (!MedicineController.ALLOWED_IMAGE_TYPES.has(file.mimetype)) {
         throw new BadRequestException('药品图片仅支持 JPG、PNG、WEBP、GIF、AVIF 格式');
+      }
+      if (file.size > 8 * 1024 * 1024) {
+        throw new BadRequestException('单张药品图片不能超过 8MB');
       }
     });
   }

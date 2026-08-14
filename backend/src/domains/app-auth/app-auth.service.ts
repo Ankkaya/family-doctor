@@ -2,9 +2,11 @@ import { ConflictException, ForbiddenException, Injectable, UnauthorizedExceptio
 import { JwtService } from '@nestjs/jwt';
 import { Prisma } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { randomUUID } from 'crypto';
 import { BufferedFile } from '@/infrastructure/minio/dto/file.dto';
 import { MinioService } from '@/infrastructure/minio/minio.service';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service';
+import { RedisService } from '@/infrastructure/redis/redis.service';
 import { LoginAppUserDto } from './dto/login-app-user.dto';
 import { RegisterAppUserDto } from './dto/register-app-user.dto';
 import { UpdateAppProfileDto } from './dto/update-app-profile.dto';
@@ -12,6 +14,7 @@ import { UpdateAppProfileDto } from './dto/update-app-profile.dto';
 type AppTokenPayload = {
   sub: string;
   typ: 'app';
+  sid: string;
 };
 
 type RegistrationPolicy = {
@@ -59,6 +62,7 @@ export class AppAuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly minioService: MinioService,
+    private readonly redisService: RedisService,
   ) {}
 
   async createAnonymousIdentity() {
@@ -94,7 +98,7 @@ export class AppAuthService {
     });
 
     return {
-      ...this.generateTokens(identity.user.id),
+      ...(await this.generateTokens(identity.user.id)),
       user: {
         id: identity.user.id,
         nickname: identity.user.nickname,
@@ -154,7 +158,7 @@ export class AppAuthService {
     });
 
     return {
-      ...this.generateTokens(user.id),
+      ...(await this.generateTokens(user.id)),
       user,
     };
   }
@@ -185,7 +189,7 @@ export class AppAuthService {
     const { passwordHash: _passwordHash, ...safeUser } = user;
 
     return {
-      ...this.generateTokens(user.id),
+      ...(await this.generateTokens(user.id)),
       user: safeUser,
     };
   }
@@ -208,9 +212,14 @@ export class AppAuthService {
     }
 
     return {
-      ...this.generateTokens(user.id),
+      ...(await this.generateTokens(user.id)),
       user,
     };
+  }
+
+  async logout(appUserId: string) {
+    await this.redisService.del(this.buildSessionKey(appUserId));
+    return { success: true } as const;
   }
 
   async updateProfile(appUserId: string, dto: UpdateAppProfileDto) {
@@ -245,9 +254,10 @@ export class AppAuthService {
     });
   }
 
-  private generateTokens(appUserId: string) {
-    const payload: AppTokenPayload = { sub: appUserId, typ: 'app' };
-    return {
+  private async generateTokens(appUserId: string) {
+    const sid = randomUUID();
+    const payload: AppTokenPayload = { sub: appUserId, typ: 'app', sid };
+    const tokens = {
       token: this.jwtService.sign(payload, {
         secret: this.getAccessSecret(),
         expiresIn: (process.env.APP_JWT_EXPIRES_IN || '7d') as any,
@@ -257,6 +267,12 @@ export class AppAuthService {
         expiresIn: (process.env.APP_JWT_REFRESH_EXPIRES_IN || '30d') as any,
       }),
     };
+    await this.redisService.set(
+      this.buildSessionKey(appUserId),
+      sid,
+      this.getRefreshTtlSeconds(),
+    );
+    return tokens;
   }
 
   private async verifyRefreshToken(refreshToken: string): Promise<AppTokenPayload> {
@@ -264,8 +280,12 @@ export class AppAuthService {
       const payload = await this.jwtService.verifyAsync<AppTokenPayload>(refreshToken, {
         secret: this.getRefreshSecret(),
       });
-      if (payload.typ !== 'app' || !payload.sub) {
+      if (payload.typ !== 'app' || !payload.sub || !payload.sid) {
         throw new UnauthorizedException('App 刷新令牌无效');
+      }
+      const activeSid = await this.redisService.get(this.buildSessionKey(payload.sub));
+      if (activeSid !== payload.sid) {
+        throw new UnauthorizedException('App 刷新令牌已失效');
       }
       return payload;
     } catch {
@@ -279,6 +299,19 @@ export class AppAuthService {
 
   private getRefreshSecret() {
     return process.env.APP_JWT_REFRESH_SECRET || process.env.JWT_REFRESH_SECRET || this.getAccessSecret();
+  }
+
+  private buildSessionKey(appUserId: string) {
+    return `app:session:${appUserId}`;
+  }
+
+  private getRefreshTtlSeconds() {
+    const value = process.env.APP_JWT_REFRESH_EXPIRES_IN || '30d';
+    const match = /^(\d+)([smhd])$/.exec(value.trim().toLowerCase());
+    if (!match) return 30 * 24 * 60 * 60;
+    const amount = Number(match[1]);
+    const multipliers = { s: 1, m: 60, h: 3600, d: 86400 } as const;
+    return amount * multipliers[match[2] as keyof typeof multipliers];
   }
 
   private normalizeUsername(username: string) {

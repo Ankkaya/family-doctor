@@ -5,7 +5,7 @@ import uuid
 from collections.abc import AsyncIterator
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 from ag_ui.core import (
     CustomEvent,
@@ -21,6 +21,8 @@ from ag_ui.core import (
     TextMessageEndEvent,
     TextMessageStartEvent,
 )
+
+from ..security import require_agent_token
 from ag_ui.encoder import EventEncoder
 
 from ..graph.nodes.render import (
@@ -48,7 +50,7 @@ from ..tools.intent_router import (
 )
 from ..tracing import trace_node
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_agent_token)])
 
 NODE_STATUS_MESSAGES = {
     "intent_router": "正在判断任务类型",

@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 
 from ..schemas import RecognizeMedicineImagesRequest, RecognizeMedicineImagesResponse
+from ..security import require_agent_token
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_agent_token)])
 
 PROMPT_PATH = Path(__file__).resolve().parents[2] / "prompts" / "medicine_recognize.v1.md"
 RECOGNIZE_SYSTEM_PROMPT = PROMPT_PATH.read_text(encoding="utf-8").strip()

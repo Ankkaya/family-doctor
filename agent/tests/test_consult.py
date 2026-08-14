@@ -192,13 +192,17 @@ def client(monkeypatch: pytest.MonkeyPatch) -> Generator[TestClient, None, None]
     monkeypatch.setenv("LLM_PROVIDER", "openai")
     monkeypatch.setenv("LLM_MODEL", "test-model")
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("AGENT_INTERNAL_TOKEN", "test-agent-token")
     monkeypatch.setattr(
         main_module,
         "get_llm_provider",
         lambda settings: FakeProvider(model=settings.llm_model),
     )
     get_settings.cache_clear()
-    with TestClient(main_module.create_app()) as test_client:
+    with TestClient(
+        main_module.create_app(),
+        headers={"x-agent-token": "test-agent-token"},
+    ) as test_client:
         yield test_client
     get_settings.cache_clear()
 
@@ -207,6 +211,16 @@ def test_health(client: TestClient) -> None:
     r = client.get("/agent/health")
     assert r.status_code == 200
     assert r.json()["status"] == "ok"
+
+
+def test_agent_api_rejects_missing_internal_token(client: TestClient) -> None:
+    r = client.post(
+        "/agent/consult",
+        headers={"x-agent-token": ""},
+        json={"sessionId": "s-auth", "question": "头痛怎么办", "medicines": []},
+    )
+
+    assert r.status_code == 403
 
 
 def test_consult_basic(client: TestClient) -> None:
@@ -269,6 +283,62 @@ def test_consult_uses_history_for_follow_up_question(client: TestClient) -> None
     names = [item["name"] for item in body["recommends"]]
     assert "布洛芬缓释胶囊" in names
     assert "头痛" in body["sessionSummary"]["symptoms"]
+
+
+def test_consult_hard_blocks_allergy_contraindication(client: TestClient) -> None:
+    r = client.post(
+        "/agent/consult",
+        json={
+            "sessionId": "s-allergy",
+            "question": "细菌感染能吃什么",
+            "allowRxRecommendation": True,
+            "userProfile": {"age": 30, "allergies": "青霉素"},
+            "medicines": [SAMPLE_MEDICINES[2]],
+        },
+    )
+
+    assert r.status_code == 200
+    assert r.json()["recommends"] == []
+    review = next(t for t in r.json()["traces"] if t["nodeName"] == "review")
+    assert "过敏史" in review["output"]["rejected"][0]["reason"]
+
+
+def test_consult_never_recommends_rx_for_self_medication(client: TestClient) -> None:
+    medicine = {
+        **SAMPLE_MEDICINES[2],
+        "indication": "头痛、发热",
+    }
+    r = client.post(
+        "/agent/consult",
+        json={
+            "sessionId": "s-rx",
+            "question": "头痛发热吃什么",
+            "allowRxRecommendation": True,
+            "medicines": [medicine],
+        },
+    )
+
+    assert r.status_code == 200
+    assert r.json()["recommends"] == []
+    review = next(t for t in r.json()["traces"] if t["nodeName"] == "review")
+    assert "处方药" in review["output"]["rejected"][0]["reason"]
+
+
+def test_consult_hard_blocks_child_self_medication(client: TestClient) -> None:
+    r = client.post(
+        "/agent/consult",
+        json={
+            "sessionId": "s-child",
+            "question": "孩子头痛发热吃什么",
+            "userProfile": {"age": 8},
+            "medicines": [SAMPLE_MEDICINES[0]],
+        },
+    )
+
+    assert r.status_code == 200
+    assert r.json()["recommends"] == []
+    review = next(t for t in r.json()["traces"] if t["nodeName"] == "review")
+    assert "儿童用药" in review["output"]["rejected"][0]["reason"]
 
 
 def test_consult_does_not_recommend_weak_vector_match_for_headache(client: TestClient) -> None:

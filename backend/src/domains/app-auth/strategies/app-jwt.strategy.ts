@@ -2,15 +2,20 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service';
+import { RedisService } from '@/infrastructure/redis/redis.service';
 
 type AppJwtPayload = {
   sub: string;
   typ?: string;
+  sid?: string;
 };
 
 @Injectable()
 export class AppJwtStrategy extends PassportStrategy(Strategy, 'app-jwt') {
-  constructor(private readonly prisma: PrismaService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly redisService: RedisService,
+  ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
@@ -19,8 +24,13 @@ export class AppJwtStrategy extends PassportStrategy(Strategy, 'app-jwt') {
   }
 
   async validate(payload: AppJwtPayload) {
-    if (payload.typ !== 'app' || !payload.sub) {
+    if (payload.typ !== 'app' || !payload.sub || !payload.sid) {
       throw new UnauthorizedException('App 访问令牌无效');
+    }
+
+    const activeSid = await this.redisService.get(`app:session:${payload.sub}`);
+    if (activeSid !== payload.sid) {
+      throw new UnauthorizedException('App 会话已失效');
     }
 
     const user = await this.prisma.appUser.findFirst({

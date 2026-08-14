@@ -13,18 +13,6 @@ export type MedicineCatalogItem = {
   updatedAt: Date | string;
 };
 
-export type UserMedicineCabinetItem = MedicineCatalogItem & {
-  inventoryId: string;
-  devUserId: string;
-  medicineId: string;
-  quantity: number;
-  expireAt: Date | string | null;
-  source: string | null;
-  notes: string | null;
-  inventoryCreatedAt: Date | string;
-  inventoryUpdatedAt: Date | string;
-};
-
 export type RecognizedMedicineItem = {
   name: string;
   aliases: string[];

@@ -8,7 +8,7 @@
               <h2 class="session-strip__title">{{ detail.title || '问诊详情' }}</h2>
               <div class="session-strip__meta">
                 <span class="session-meta-pill">家庭：{{ detail.householdName || detail.householdId || '-' }}</span>
-                <span class="session-meta-pill">用户：{{ detail.userNickname || detail.userPhone || detail.userId || detail.devUserId || '-' }}</span>
+                <span class="session-meta-pill">用户：{{ detail.userNickname || detail.userPhone || detail.userId || '-' }}</span>
                 <span class="session-meta-pill">创建时间：{{ formatDate(detail.createdAt) }}</span>
                 <span class="session-meta-pill">状态：{{ statusLabel(detail.status) }}</span>
                 <span class="session-meta-pill">摘要更新：{{ formatDate(detail.summaryUpdatedAt || '') }}</span>

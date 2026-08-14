@@ -83,7 +83,7 @@ const pagination = reactive({
 const columns: DataTableColumns<ConsultationSession> = [
   { title: '标题', key: 'title', minWidth: 220, ellipsis: { tooltip: true }, render: row => row.title || '-' },
   { title: '家庭', key: 'householdName', minWidth: 160, render: row => row.householdName || row.householdId || '-' },
-  { title: '用户', key: 'userNickname', minWidth: 150, render: row => row.userNickname || row.userPhone || row.userId || row.devUserId || '-' },
+  { title: '用户', key: 'userNickname', minWidth: 150, render: row => row.userNickname || row.userPhone || row.userId || '-' },
   {
     title: '状态',
     key: 'status',

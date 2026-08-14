@@ -132,7 +132,6 @@ export interface ConsultationSession {
   id: string;
   userId: string | null;
   householdId: string | null;
-  devUserId: string | null;
   householdName?: string | null;
   userNickname?: string | null;
   userPhone?: string | null;

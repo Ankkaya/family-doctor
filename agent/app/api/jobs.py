@@ -3,12 +3,13 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Literal
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 
 from ..tools.cron_job_tool import CronJobTool
+from ..security import require_agent_token
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_agent_token)])
 
 
 class ExecuteJobRequest(BaseModel):

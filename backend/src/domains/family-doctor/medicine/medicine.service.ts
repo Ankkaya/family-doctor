@@ -8,10 +8,9 @@ import { AgentMedicineBrief, AgentRecognizeMedicineImageOutput } from '../agent-
 import { buildDeterministicEmbeddingText, buildSearchText } from '../search/embedding.util';
 import { QueryMedicineDto } from './dto/query-medicine.dto';
 import { UpsertMedicineDto } from './dto/upsert-medicine.dto';
-import { MedicineCatalogItem, RecognizedMedicineItem, UserMedicineCabinetItem } from './medicine.types';
+import { MedicineCatalogItem, RecognizedMedicineItem } from './medicine.types';
 
 type MedicineCatalogRow = MedicineCatalogItem;
-type UserMedicineCabinetRow = UserMedicineCabinetItem;
 type CountRow = { count: bigint | number | string };
 
 const SELECT_MEDICINE_COLUMNS = Prisma.sql`
@@ -27,30 +26,6 @@ const SELECT_MEDICINE_COLUMNS = Prisma.sql`
   approval_number as "approvalNumber",
   created_at as "createdAt",
   updated_at as "updatedAt"
-`;
-
-const SELECT_USER_CABINET_COLUMNS = Prisma.sql`
-  i.id as "inventoryId",
-  i.dev_user_id as "devUserId",
-  m.id,
-  m.id as "medicineId",
-  m.name,
-  m.aliases,
-  m.otc::text as otc,
-  m.indication,
-  m.contraindication,
-  m.adverse_reaction as "adverseReaction",
-  m.dosage,
-  m.barcode,
-  m.approval_number as "approvalNumber",
-  m.created_at as "createdAt",
-  m.updated_at as "updatedAt",
-  i.quantity,
-  i.expire_at as "expireAt",
-  i.source,
-  i.notes,
-  i.created_at as "inventoryCreatedAt",
-  i.updated_at as "inventoryUpdatedAt"
 `;
 
 @Injectable()
@@ -118,72 +93,6 @@ export class MedicineService {
 
     const matchedCatalogItem = await this.findCatalogMatch(recognized);
     return this.normalizeRecognizedMedicine(recognized, matchedCatalogItem);
-  }
-
-  async findUserCabinet(query: QueryMedicineDto, devUserId = 'local-dev') {
-    const page = query.page ?? 1;
-    const pageSize = query.pageSize ?? 20;
-    const skip = (page - 1) * pageSize;
-    const keyword = query.keyword?.trim();
-    const where = this.buildCabinetWhere(devUserId, keyword);
-
-    const [items, countRows] = await Promise.all([
-      this.prisma.$queryRaw<UserMedicineCabinetRow[]>(Prisma.sql`
-        SELECT ${SELECT_USER_CABINET_COLUMNS}
-        FROM user_medicine_inventory i
-        INNER JOIN medicine_catalog m ON m.id = i.medicine_id
-        ${where}
-        ORDER BY i.updated_at DESC
-        LIMIT ${pageSize}
-        OFFSET ${skip}
-      `),
-      this.prisma.$queryRaw<CountRow[]>(Prisma.sql`
-        SELECT COUNT(*) as count
-        FROM user_medicine_inventory i
-        INNER JOIN medicine_catalog m ON m.id = i.medicine_id
-        ${where}
-      `),
-    ]);
-
-    return {
-      items: items.map(this.normalizeCabinetRow),
-      total: Number(countRows[0]?.count ?? 0),
-      page,
-      pageSize,
-    };
-  }
-
-  async findAgentBriefsByDevUser(devUserId = 'local-dev'): Promise<AgentMedicineBrief[]> {
-    const rows = await this.prisma.$queryRaw<MedicineCatalogRow[]>(Prisma.sql`
-      SELECT ${Prisma.sql`
-        m.id,
-        m.name,
-        m.aliases,
-        m.otc::text as otc,
-        m.indication,
-        m.contraindication,
-        m.adverse_reaction as "adverseReaction",
-        m.dosage,
-        m.barcode,
-        m.approval_number as "approvalNumber",
-        m.created_at as "createdAt",
-        m.updated_at as "updatedAt"
-      `}
-      FROM user_medicine_inventory i
-      INNER JOIN medicine_catalog m ON m.id = i.medicine_id
-      WHERE i.dev_user_id = ${devUserId}
-      ORDER BY m.name ASC
-      LIMIT 500
-    `);
-
-    return rows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      otc: row.otc,
-      indication: row.indication,
-      contraindication: row.contraindication,
-      adverseReaction: row.adverseReaction,
-    }));
   }
 
   async create(dto: UpsertMedicineDto) {
@@ -282,26 +191,6 @@ export class MedicineService {
     `;
   }
 
-  private buildCabinetWhere(devUserId: string, keyword?: string) {
-    if (!keyword) {
-      return Prisma.sql`WHERE i.dev_user_id = ${devUserId}`;
-    }
-
-    const like = `%${keyword}%`;
-    return Prisma.sql`
-      WHERE i.dev_user_id = ${devUserId}
-      AND (
-        m.name ILIKE ${like}
-        OR m.indication ILIKE ${like}
-        OR EXISTS (
-          SELECT 1
-          FROM unnest(m.aliases) alias
-          WHERE alias ILIKE ${like}
-        )
-      )
-    `;
-  }
-
   private normalizeDto(dto: UpsertMedicineDto) {
     return {
       name: dto.name.trim(),
@@ -317,13 +206,6 @@ export class MedicineService {
   }
 
   private normalizeRow(row: MedicineCatalogRow): MedicineCatalogItem {
-    return {
-      ...row,
-      aliases: row.aliases ?? [],
-    };
-  }
-
-  private normalizeCabinetRow(row: UserMedicineCabinetRow): UserMedicineCabinetItem {
     return {
       ...row,
       aliases: row.aliases ?? [],

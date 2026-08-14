@@ -432,7 +432,6 @@ async function main() {
   const inventorySeeds = [
     {
       id: 'inv-local-dev-med-ibu',
-      devUserId: 'local-dev',
       medicineId: 'med-ibu',
       quantity: 1,
       expireAt: '2026-12-31',
@@ -441,7 +440,6 @@ async function main() {
     },
     {
       id: 'inv-local-dev-med-lhqw',
-      devUserId: 'local-dev',
       medicineId: 'med-lhqw',
       quantity: 1,
       expireAt: '2025-11-20',
@@ -450,7 +448,6 @@ async function main() {
     },
     {
       id: 'inv-local-dev-med-hxzq',
-      devUserId: 'local-dev',
       medicineId: 'med-hxzq',
       quantity: 2,
       expireAt: '2026-08-05',
@@ -458,37 +455,6 @@ async function main() {
       notes: '胃肠不适常备用药',
     },
   ];
-
-  for (const item of inventorySeeds) {
-    await prisma.$executeRaw`
-      INSERT INTO user_medicine_inventory (
-        id,
-        dev_user_id,
-        medicine_id,
-        quantity,
-        expire_at,
-        source,
-        notes
-      )
-      VALUES (
-        ${item.id},
-        ${item.devUserId},
-        ${item.medicineId},
-        ${item.quantity},
-        ${item.expireAt}::date,
-        ${item.source},
-        ${item.notes}
-      )
-      ON CONFLICT (dev_user_id, medicine_id) DO UPDATE SET
-        quantity = EXCLUDED.quantity,
-        expire_at = EXCLUDED.expire_at,
-        source = EXCLUDED.source,
-        notes = EXCLUDED.notes,
-        updated_at = now()
-    `;
-  }
-
-  console.log('✅ local-dev 家庭药箱种子数据初始化完成:', inventorySeeds.length, '条');
 
   await prisma.$executeRaw`
     INSERT INTO app_user (

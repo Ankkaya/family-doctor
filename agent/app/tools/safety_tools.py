@@ -85,6 +85,41 @@ def build_warnings(med: MedicineBrief, profile: UserProfile | None, flags: list[
     return dedupe(warnings)
 
 
+def hard_block_reasons(
+    *,
+    medicine: MedicineBrief,
+    profile: UserProfile | None,
+    flags: list[str],
+) -> list[str]:
+    """Return deterministic reasons that must veto an LLM recommendation."""
+    reasons: list[str] = []
+    contraindication = (medicine.contraindication or "").lower()
+
+    if medicine.otc == "RX":
+        reasons.append("处方药不作为家庭自行用药推荐，仅可用于就医沟通。")
+
+    if profile:
+        allergies = normalize_profile_text(profile.allergies)
+        chronic_diseases = normalize_profile_text(profile.chronic_diseases)
+        if allergies and any(
+            term.lower() in contraindication for term in split_terms(allergies)
+        ):
+            reasons.append("过敏史与药品禁忌存在明确匹配。")
+        if chronic_diseases and any(
+            term.lower() in contraindication for term in split_terms(chronic_diseases)
+        ):
+            reasons.append("基础病与药品禁忌存在明确匹配。")
+
+    if "child" in flags:
+        reasons.append("儿童用药需要结合体重、剂型和专用剂量，由医生或药师评估。")
+    if "pregnant" in flags:
+        reasons.append("孕期用药需要由医生或药师评估。")
+    if "lactating" in flags:
+        reasons.append("哺乳期用药需要由医生或药师评估。")
+
+    return dedupe(reasons)
+
+
 def audit_recommendations(
     *,
     recommends: list[Recommend],

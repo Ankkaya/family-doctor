@@ -25,6 +25,7 @@ def build_graph(*, llm: LLMProvider, disclaimer: str, include_render: bool = Tru
     sg.add_node("match", make_match_node())
     sg.add_node("review", make_review_node(llm))
     sg.add_node("safety", make_safety_node())
+    sg.add_node("summarize", make_summarize_node())
     if include_render:
         sg.add_node("render", make_render_node(llm, disclaimer=disclaimer))
 
@@ -37,8 +38,9 @@ def build_graph(*, llm: LLMProvider, disclaimer: str, include_render: bool = Tru
     sg.add_edge("review", "safety")
     if include_render:
         sg.add_edge("safety", "render")
-        sg.add_edge("render", END)
+        sg.add_edge("render", "summarize")
     else:
-        sg.add_edge("safety", END)
+        sg.add_edge("safety", "summarize")
+    sg.add_edge("summarize", END)
 
     return sg.compile()

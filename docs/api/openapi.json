@@ -1263,6 +1263,26 @@
         ]
       }
     },
+    "/app/auth/logout": {
+      "post": {
+        "operationId": "AppAuthController_logout",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "App 注销当前会话",
+        "tags": [
+          "App/认证"
+        ]
+      }
+    },
     "/app/auth/profile": {
       "patch": {
         "operationId": "AppAuthController_updateProfile",
@@ -3443,6 +3463,36 @@
         ]
       }
     },
+    "/consultation/ag-ui": {
+      "post": {
+        "operationId": "ConsultationController_askAgUi",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgUiRunAgentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "App 通过 AG-UI 协议流式发起一次问诊",
+        "tags": [
+          "家庭医生/问诊"
+        ]
+      }
+    },
     "/consultation/sessions": {
       "get": {
         "operationId": "ConsultationController_findUserSessions",
@@ -3534,6 +3584,35 @@
           }
         ],
         "summary": "App 查看当前用户问诊详情",
+        "tags": [
+          "家庭医生/问诊"
+        ]
+      }
+    },
+    "/consultation/sessions/{id}/close": {
+      "patch": {
+        "operationId": "ConsultationController_closeUserSession",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "App 关闭当前问诊会话",
         "tags": [
           "家庭医生/问诊"
         ]
@@ -3677,6 +3756,36 @@
           }
         ],
         "summary": "后台查看问诊 Agent Prompt 目录",
+        "tags": [
+          "家庭医生/问诊"
+        ]
+      }
+    },
+    "/admin/consultations-debug/run": {
+      "post": {
+        "operationId": "ConsultationController_runDebug",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunConsultationDebugDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "后台运行一次问诊 Agent 调试",
         "tags": [
           "家庭医生/问诊"
         ]
@@ -5204,6 +5313,100 @@
                 "$ref": "#/components/schemas/AskConsultationAudioDto"
               }
             ]
+          }
+        },
+        "required": [
+          "question"
+        ]
+      },
+      "AgUiRunAgentDto": {
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "description": "AG-UI thread id"
+          },
+          "runId": {
+            "type": "string",
+            "description": "AG-UI run id"
+          },
+          "parentRunId": {
+            "type": "string",
+            "description": "Parent run id"
+          },
+          "messages": {
+            "description": "Conversation messages",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "state": {
+            "type": "object",
+            "description": "Shared AG-UI state"
+          },
+          "tools": {
+            "description": "Client-provided tools",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "context": {
+            "description": "Client context values",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "forwardedProps": {
+            "type": "object",
+            "description": "Additional forwarded props"
+          }
+        },
+        "required": [
+          "threadId",
+          "runId",
+          "messages",
+          "state",
+          "tools",
+          "context",
+          "forwardedProps"
+        ]
+      },
+      "RunConsultationDebugDto": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string",
+            "description": "调试输入的问题文本"
+          },
+          "householdId": {
+            "type": "string",
+            "description": "用于读取家庭药箱全集的家庭 ID；为空时使用空药箱"
+          },
+          "userId": {
+            "type": "string",
+            "description": "用于读取用户画像的 App 用户 ID；为空时不传用户画像"
+          },
+          "allowRxRecommendation": {
+            "type": "boolean",
+            "description": "是否允许 Agent 推荐 RX 处方药，默认 false"
+          },
+          "historyMessages": {
+            "description": "模拟传给 Agent 的近期历史消息",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sessionSummary": {
+            "type": "object",
+            "description": "模拟传给 Agent 的会话摘要"
+          },
+          "conversationStatus": {
+            "type": "string",
+            "description": "模拟当前会话状态"
           }
         },
         "required": [

@@ -3,12 +3,13 @@ import type { AGUIEvent, RunAgentInput } from "@ag-ui/core";
 import { httpClient } from "@/shared/api/http-client";
 import { isTauri } from "@/shared/lib/platform";
 import { appStore } from "@/shared/storage/app-store";
+import { authTokenStore } from "@/shared/security/auth-token-store";
 import type { ChatCard, ChatMessage, HistorySession, Medicine } from "@/shared/mock/app-data";
 
 type BackendOtcType = "OTC" | "RX";
 
-const TOKEN_KEY = "app_access_token";
-const REFRESH_TOKEN_KEY = "app_refresh_token";
+const LEGACY_TOKEN_KEY = "app_access_token";
+const LEGACY_REFRESH_TOKEN_KEY = "app_refresh_token";
 const HOUSEHOLD_KEY = "current_household_id";
 
 type BackendMedicine = {
@@ -75,7 +76,6 @@ type BackendConsultationSession = {
   id: string;
   userId?: string | null;
   householdId?: string | null;
-  devUserId?: string | null;
   title: string | null;
   createdAt: string;
   messageCount?: number;
@@ -333,8 +333,7 @@ async function persistSession(auth: AppAuthResponse, preferredHouseholdId?: stri
     households,
   };
   const writes = [
-    appStore.set(TOKEN_KEY, auth.token),
-    appStore.set(REFRESH_TOKEN_KEY, auth.refreshToken),
+    authTokenStore.set(auth.token, auth.refreshToken),
   ];
   if (household?.id) {
     writes.push(appStore.set(HOUSEHOLD_KEY, household.id));
@@ -346,19 +345,20 @@ async function persistSession(auth: AppAuthResponse, preferredHouseholdId?: stri
 }
 
 async function loadStoredSession() {
-  const [token, refreshToken, householdId] = await Promise.all([
-    appStore.get<string>(TOKEN_KEY),
-    appStore.get<string>(REFRESH_TOKEN_KEY),
+  const [tokens, householdId] = await Promise.all([
+    authTokenStore.get(),
     appStore.get<string>(HOUSEHOLD_KEY),
+    appStore.remove(LEGACY_TOKEN_KEY),
+    appStore.remove(LEGACY_REFRESH_TOKEN_KEY),
   ]);
 
-  if (!token || !refreshToken) {
+  if (!tokens) {
     return null;
   }
 
   const refreshed = await httpClient.postJson<AppAuthResponse>(
     "/app/auth/refresh",
-    { refreshToken },
+    { refreshToken: tokens.refreshToken },
     { skipAppAuth: true },
   );
   return persistSession(refreshed, householdId);
@@ -577,6 +577,7 @@ export const appApi = {
   },
 
   async login(input: { username: string; password: string }) {
+    await authTokenStore.unlock(input.username, input.password);
     const auth = await httpClient.postJson<AppAuthResponse>("/app/auth/login", input, {
       skipAppAuth: true,
     });
@@ -584,6 +585,7 @@ export const appApi = {
   },
 
   async register(input: { username: string; password: string; registrationCode: string }) {
+    await authTokenStore.unlock(input.username, input.password);
     const auth = await httpClient.postJson<AppAuthResponse>("/app/auth/register", input, {
       skipAppAuth: true,
     });
@@ -615,12 +617,21 @@ export const appApi = {
   },
 
   async logout() {
-    sessionState = null;
-    await Promise.all([
-      appStore.remove(TOKEN_KEY),
-      appStore.remove(REFRESH_TOKEN_KEY),
-      appStore.remove(HOUSEHOLD_KEY),
-    ]);
+    try {
+      if (sessionState?.token) {
+        await httpClient.postJson<{ success: true }>("/app/auth/logout", undefined, {
+          suppressErrorToast: true,
+        });
+      }
+    } finally {
+      sessionState = null;
+      await Promise.all([
+        authTokenStore.clear(),
+        appStore.remove(LEGACY_TOKEN_KEY),
+        appStore.remove(LEGACY_REFRESH_TOKEN_KEY),
+        appStore.remove(HOUSEHOLD_KEY),
+      ]);
+    }
   },
 
   async listHouseholds() {

@@ -7,7 +7,11 @@ from typing import Any
 from ...llm.provider import LLMProvider
 from ...prompting import load_prompt
 from ...schemas import MedicineBrief, ParsedSymptoms, Recommend, RiskReviewOutput, UserProfile
-from ...tools.safety_tools import build_recommendation, normalize_profile_text
+from ...tools.safety_tools import (
+    build_recommendation,
+    hard_block_reasons,
+    normalize_profile_text,
+)
 from ...tracing import trace_node
 from ..context import dump_conversation_context
 
@@ -168,13 +172,14 @@ def apply_review(
 
         suitable = item.suitable
         reject_reason = item.reject_reason or ""
-        if suitable and medicine.otc == "RX" and not allow_rx_recommendation:
+        hard_blocks = hard_block_reasons(medicine=medicine, profile=profile, flags=flags)
+        if hard_blocks:
             suitable = False
-            reject_reason = "当前设置不推荐处方药，需医生或药师指导。"
+            reject_reason = "；".join(hard_blocks)
 
         fallback = build_recommendation(medicine=medicine, parsed=parsed, profile=profile, flags=flags)
         reason = item.reason.strip() or fallback.reason
-        warnings = merge_unique([*item.warnings, *fallback.warnings])
+        warnings = merge_unique([*item.warnings, *fallback.warnings, *hard_blocks])
         if suitable:
             risked.append(Recommend(
                 medicineId=medicine.id,

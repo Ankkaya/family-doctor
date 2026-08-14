@@ -211,7 +211,6 @@ model MedicineCatalog {
   approvalNumber   String?  @map("approval_number")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
-  inventories       UserMedicineInventory[]
   householdInventories HouseholdMedicineInventory[]
 
   @@index([name])
@@ -323,29 +322,10 @@ model HouseholdMedicineInventory {
   @@map("household_medicine_inventory")
 }
 
-model UserMedicineInventory {
-  id         String          @id @default(cuid())
-  devUserId  String          @map("dev_user_id")
-  medicineId String          @map("medicine_id")
-  quantity   Int             @default(1)
-  expireAt   DateTime?       @map("expire_at") @db.Date
-  source     String?
-  notes      String?
-  createdAt  DateTime        @default(now()) @map("created_at")
-  updatedAt  DateTime        @updatedAt @map("updated_at")
-  medicine   MedicineCatalog @relation(fields: [medicineId], references: [id], onDelete: Cascade)
-
-  @@unique([devUserId, medicineId])
-  @@index([devUserId])
-  @@index([medicineId])
-  @@map("user_medicine_inventory")
-}
-
 model ConsultationSession {
   id        String                @id @default(cuid())
   userId    String?               @map("user_id")
   householdId String?             @map("household_id")
-  devUserId String?               @map("dev_user_id")
   title     String?
   summary   Json?
   summaryUpdatedAt DateTime?       @map("summary_updated_at")
@@ -357,7 +337,6 @@ model ConsultationSession {
   messages  ConsultationMessage[]
   traces    AgentTrace[]
 
-  @@index([devUserId, createdAt])
   @@index([householdId, createdAt])
   @@index([userId, createdAt])
   @@index([status])

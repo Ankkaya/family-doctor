@@ -51,13 +51,19 @@ describe('AppAuthService', () => {
       sign: jest.fn((payload: Record<string, unknown>, options?: Record<string, unknown>) => {
         return options?.expiresIn === '30d' ? 'app-refresh-token' : 'app-access-token';
       }),
+      verifyAsync: jest.fn(),
     };
     const minio = {
       uploadFile: jest.fn(),
     };
+    const redis = {
+      set: jest.fn().mockResolvedValue(undefined),
+      get: jest.fn().mockResolvedValue(null),
+      del: jest.fn().mockResolvedValue(undefined),
+    };
 
-    const service = new AppAuthService(prisma as any, jwt as any, minio as any);
-    return { service, prisma, tx, jwt, minio };
+    const service = new AppAuthService(prisma as any, jwt as any, minio as any, redis as any);
+    return { service, prisma, tx, jwt, minio, redis };
   }
 
   afterEach(() => {
@@ -109,7 +115,10 @@ describe('AppAuthService', () => {
         }),
       },
     });
-    expect(jwt.sign).toHaveBeenCalledWith({ sub: 'app-user-1', typ: 'app' }, expect.any(Object));
+    expect(jwt.sign).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: 'app-user-1', typ: 'app', sid: expect.any(String) }),
+      expect.any(Object),
+    );
     expect(result).toMatchObject({
       token: 'app-access-token',
       refreshToken: 'app-refresh-token',
@@ -203,6 +212,39 @@ describe('AppAuthService', () => {
       username: 'alice',
       password: 'wrong-password',
     })).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('rotates the server-side session when refreshing a token', async () => {
+    const { service, prisma, jwt, redis } = createService();
+    jwt.verifyAsync.mockResolvedValueOnce({
+      sub: 'app-user-1',
+      typ: 'app',
+      sid: 'old-session',
+    });
+    redis.get.mockResolvedValueOnce('old-session');
+    prisma.appUser.findFirst.mockResolvedValueOnce({
+      id: 'app-user-1',
+      username: 'alice',
+      nickname: 'alice',
+      defaultHouseholdId: 'household-1',
+    });
+
+    const result = await service.refresh('old-refresh-token');
+
+    expect(result.refreshToken).toBe('app-refresh-token');
+    expect(redis.set).toHaveBeenCalledWith(
+      'app:session:app-user-1',
+      expect.not.stringMatching(/^old-session$/),
+      30 * 24 * 60 * 60,
+    );
+  });
+
+  it('revokes the server-side session on logout', async () => {
+    const { service, redis } = createService();
+
+    await service.logout('app-user-1');
+
+    expect(redis.del).toHaveBeenCalledWith('app:session:app-user-1');
   });
 
   it('updates the current app user profile', async () => {

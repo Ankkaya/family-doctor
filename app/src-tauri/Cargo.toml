@@ -19,3 +19,5 @@ tauri = { version = "2", features = [] }
 tauri-plugin-http = "2"
 tauri-plugin-sql = { version = "2", features = ["sqlite"] }
 tauri-plugin-store = "2"
+tauri-plugin-stronghold = "2"
+rust-argon2 = "2"
