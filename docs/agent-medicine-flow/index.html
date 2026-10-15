@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="从本地源码出发，交互查看家庭医生项目 Agent 查药的实际调用链、检索规则与实现边界。">
+  <title>Agent 查药流程 · Family Doctor</title>
+  <style>
+    :root { --bg:#f5f6f2; --surface:#fff; --ink:#20332e; --muted:#667670; --line:#dbe3dd; --accent:#176c50; --soft:#e8f1eb; --warn:#8c5424; --warn-bg:#fff4e6; --code:#edf1ed; --shadow:0 16px 48px #20332e08; color-scheme:light; }
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; scroll-padding-top:90px; }
+    body { margin:0; background:var(--bg); color:var(--ink); font-family:Inter,"Segoe UI","Microsoft YaHei",sans-serif; font-size:15px; line-height:1.75; }
+    button,a { -webkit-tap-highlight-color:transparent; }
+    button { font:inherit; cursor:pointer; }
+    a { color:var(--accent); text-decoration:none; }
+    a:hover { text-decoration:underline; }
+    button:focus-visible,a:focus-visible,summary:focus-visible { outline:3px solid var(--accent); outline-offset:4px; }
+    header { border-bottom:1px solid var(--line); background:var(--surface); }
+    .header-inner { max-width:1200px; margin:auto; padding:17px 32px; display:flex; align-items:center; justify-content:space-between; gap:20px; }
+    .brand { display:flex; gap:12px; align-items:center; font-weight:600; letter-spacing:.02em; }
+    .brand-mark { background:var(--accent); color:#fff; width:32px; height:32px; display:grid; place-items:center; border-radius:9px; font-size:23px; line-height:1; }
+    nav { display:flex; flex-wrap:wrap; gap:22px; font-size:13px; }
+    nav a { color:var(--muted); }
+    main { max-width:1200px; margin:auto; padding:50px 32px 40px; }
+    .eyebrow { color:var(--accent); font-size:12px; letter-spacing:.13em; font-weight:600; text-transform:uppercase; }
+    h1 { font-size:clamp(30px,4vw,48px); line-height:1.25; letter-spacing:-.035em; margin:14px 0 20px; font-weight:600; }
+    h2 { font-size:25px; line-height:1.4; font-weight:600; margin:0; }
+    h3 { font-size:17px; line-height:1.5; font-weight:600; margin:0 0 9px; }
+    p { margin:0 0 14px; }
+    .lead { color:var(--muted); max-width:810px; font-size:17px; }
+    .meta { display:flex; flex-wrap:wrap; gap:10px 20px; color:var(--muted); font-size:12px; margin-top:23px; }
+    .big-route { display:flex; align-items:center; flex-wrap:wrap; gap:13px; margin:29px 0 44px; padding:19px 0; border-block:1px solid var(--line); }
+    .big-route b { font-weight:500; }
+    .arrow { color:var(--muted); }
+    .overview { margin:26px 0 44px; padding-top:22px; border-top:1px solid var(--line); }
+    .overview .section-head { margin-bottom:14px; }
+    .overview-summary { font-size:14px; color:var(--muted); margin:10px 0 0; max-width:920px; }
+    .overview-summary strong { color:var(--accent); font-weight:600; }
+    .diagram-wrap { overflow-x:auto; padding:6px 0; }
+    .agent-diagram { display:block; width:100%; min-width:720px; height:auto; }
+    .agent-diagram .flow-edge { fill:none; stroke:var(--muted); stroke-width:1.5; }
+    .agent-diagram .node-box { fill:var(--surface); stroke:var(--line); stroke-width:1; }
+    .agent-diagram .node-llm .node-box { fill:var(--soft); }
+    .agent-diagram .node-terminal .node-box { fill:var(--code); }
+    .agent-diagram .node-selected .node-box { stroke:var(--accent); stroke-width:2; }
+    .agent-diagram a:hover .node-box { stroke:var(--accent); }
+    .agent-diagram .node-title { fill:var(--ink); font-size:14px; font-weight:500; }
+    .agent-diagram .node-caption { fill:var(--muted); font-size:11px; }
+    .agent-diagram .edge-caption { fill:var(--muted); font-size:12px; }
+    .diagram-caption { font-size:12px; color:var(--muted); margin:0 0 14px; }
+    .cycle-notes { display:grid; grid-template-columns:1fr 1fr 1fr; gap:18px; border-top:1px solid var(--line); padding-top:16px; }
+    .cycle-notes p { color:var(--muted); font-size:12px; margin:0; }
+    .cycle-notes strong { display:block; color:var(--ink); font-size:13px; font-weight:500; margin-bottom:4px; }
+    .section-head { display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:18px; margin-bottom:22px; }
+    .section-head p { margin:6px 0 0; color:var(--muted); font-size:13px; }
+    .switch { display:flex; flex-wrap:wrap; padding:4px; background:var(--code); border-radius:10px; gap:3px; }
+    .switch button { border:0; border-radius:7px; background:transparent; color:var(--muted); padding:8px 15px; font-size:13px; }
+    .switch button[aria-pressed="true"] { background:var(--surface); color:var(--accent); box-shadow:0 2px 6px #20332e0b; }
+    .flow-layout { display:grid; grid-template-columns:345px minmax(0,1fr); gap:24px; align-items:start; }
+    .steps { display:grid; gap:5px; }
+    .step { text-align:left; position:relative; display:grid; grid-template-columns:35px minmax(0,1fr) auto; gap:10px; align-items:center; border:1px solid transparent; background:transparent; color:var(--ink); padding:12px 13px; border-radius:10px; width:100%; }
+    .step:hover { background:var(--soft); }
+    .step[aria-pressed="true"] { background:var(--surface); border-color:var(--accent); box-shadow:var(--shadow); }
+    .step-number { color:var(--muted); font-family:Consolas,monospace; font-size:13px; }
+    .step[aria-pressed="true"] .step-number { color:var(--accent); }
+    .step-title { font-size:14px; font-weight:500; }
+    .step-sub { font-family:Consolas,monospace; font-size:11px; color:var(--muted); display:block; overflow-wrap:anywhere; }
+    .tag { display:inline-block; font-size:11px; color:var(--accent); background:var(--soft); padding:2px 7px; border-radius:5px; white-space:nowrap; }
+    .tag.rule { color:var(--muted); background:var(--code); }
+    .detail { background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:29px; min-width:0; box-shadow:var(--shadow); }
+    .detail-top { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; }
+    .detail h3 { font-size:25px; margin:0 0 12px; }
+    .detail-intro { color:var(--muted); margin-bottom:22px; }
+    .io { display:grid; grid-template-columns:1fr 1fr; gap:22px; margin:25px 0; padding:18px 0; border-block:1px solid var(--line); }
+    .small-label { display:block; font-size:11px; text-transform:uppercase; letter-spacing:.09em; color:var(--muted); margin-bottom:8px; }
+    .io p { font-size:13px; margin:0; overflow-wrap:anywhere; }
+    ul { padding-left:20px; margin:10px 0 24px; }
+    li { padding:3px 0; }
+    .detail li { font-size:14px; }
+    pre { background:var(--code); color:var(--ink); padding:18px; border-radius:9px; font-size:12px; line-height:1.8; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; }
+    code { font-family:Consolas,"Cascadia Code",monospace; font-size:.9em; overflow-wrap:anywhere; }
+    .refs { display:grid; gap:7px; margin-top:20px; }
+    .ref { font-family:Consolas,monospace; font-size:11px; color:var(--muted); overflow-wrap:anywhere; }
+    .detail-bottom { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-top:26px; }
+    .control { border:1px solid var(--line); background:var(--surface); color:var(--ink); padding:8px 15px; border-radius:8px; font-size:13px; }
+    .control.primary { color:#fff; background:var(--accent); border-color:var(--accent); }
+    .control:disabled { opacity:.4; cursor:default; }
+    .mode-note { margin:18px 0 0; padding:16px 19px; border-left:3px solid var(--accent); background:var(--soft); font-size:13px; }
+    section + section { margin-top:64px; }
+    .retrieval { display:grid; grid-template-columns:1.1fr 1fr; gap:26px; }
+    .panel { background:var(--surface); border:1px solid var(--line); border-radius:13px; padding:25px; min-width:0; }
+    .formula { padding:22px 0 18px; font-size:19px; font-family:Consolas,"Microsoft YaHei",monospace; line-height:2; }
+    .formula span { color:var(--accent); font-weight:600; }
+    .quiet { color:var(--muted); font-size:13px; }
+    .table-wrap { overflow-x:auto; }
+    table { border-collapse:collapse; width:100%; font-size:13px; }
+    th,td { border-bottom:1px solid var(--line); padding:13px 9px; text-align:left; vertical-align:top; }
+    th { color:var(--muted); font-weight:500; }
+    td:first-child { white-space:nowrap; }
+    .boundaries { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    .boundary { padding:22px 24px; border:1px solid var(--line); border-radius:12px; background:var(--surface); }
+    .boundary .number { color:var(--accent); font-size:12px; display:block; margin-bottom:10px; }
+    .boundary p { font-size:13px; color:var(--muted); margin:0; }
+    .boundary.warning { background:var(--warn-bg); border-color:color-mix(in srgb,var(--warn) 20%,var(--line)); }
+    .boundary.warning .number { color:var(--warn); }
+    details { border-bottom:1px solid var(--line); padding:16px 0; }
+    summary { cursor:pointer; font-size:14px; font-weight:500; }
+    details p { padding:14px 0 0; color:var(--muted); font-size:13px; }
+    .sources { display:grid; gap:0; }
+    .source-row { display:flex; align-items:center; justify-content:space-between; gap:20px; padding:15px 0; border-bottom:1px solid var(--line); }
+    .source-row div { min-width:0; }
+    .source-row strong { font-size:13px; font-weight:500; display:block; }
+    .source-row code { color:var(--muted); font-size:11px; }
+    .copy { white-space:nowrap; font-size:12px; }
+    footer { margin-top:40px; padding-top:22px; border-top:1px solid var(--line); color:var(--muted); font-size:12px; display:flex; gap:20px; justify-content:space-between; flex-wrap:wrap; }
+    @media (prefers-color-scheme:dark) { :root { --bg:#121b17; --surface:#19251f; --ink:#e2ebe5; --muted:#a3b5a9; --line:#314338; --accent:#83d2ad; --soft:#213d30; --warn:#ebbb86; --warn-bg:#35291c; --code:#23342a; --shadow:none; color-scheme:dark; } .brand-mark,.control.primary { color:#12251b; } }
+    @media (max-width:900px) { .flow-layout { grid-template-columns:280px minmax(0,1fr); gap:16px; } .detail { padding:22px; } .retrieval { grid-template-columns:1fr; } }
+    @media (max-width:680px) { main { padding:32px 18px; } .header-inner { padding:14px 18px; align-items:flex-start; flex-direction:column; gap:10px; } nav { gap:20px; } .flow-layout { grid-template-columns:1fr; } .steps { grid-template-columns:1fr 1fr; gap:4px; } .step { padding:10px 8px; grid-template-columns:25px minmax(0,1fr); gap:4px; } .step .tag { display:none; } .step-title { font-size:12px; } .step-sub { font-size:10px; } .io { grid-template-columns:1fr; gap:15px; } .boundaries { grid-template-columns:1fr; } section + section { margin-top:42px; } .big-route { gap:10px; font-size:13px; } .source-row { gap:12px; } .panel { padding:20px; } .cycle-notes { grid-template-columns:1fr; gap:12px; } }
+    @media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } }
+  </style>
+</head>
+<body>
+  <header><div class="header-inner"><a class="brand" href="#top"><span class="brand-mark" aria-hidden="true">+</span> Family Doctor <span class="quiet">/ 工程导览</span></a><nav aria-label="页内导航"><a href="#overview">流程图</a><a href="#flow">调用流程</a><a href="#retrieval">检索规则</a><a href="#boundaries">实现边界</a><a href="#sources">源码索引</a></nav></div></header>
+  <main id="top">
+    <div class="eyebrow">Source walkthrough · Agent / Medicine</div>
+    <h1>一句“家里有什么药”，<br>在项目里如何被处理？</h1>
+    <p class="lead">后端从当前家庭药箱召回候选，Agent 理解问题并逐药审查，规则否决不适合的推荐，最后将回复和药品卡片流式送回 App。</p>
+    <div class="meta"><span>依据：当前工作区源码（含未提交改动）</span><span>流程图复核：2026-10-14</span><span>本地静态说明 · 不调用模型或数据库</span></div>
+    <section class="overview" id="overview" aria-labelledby="overview-title">
+      <div class="section-head"><div><div class="eyebrow">Agent / Control flow</div><h2 id="overview-title">当前查药 Agent：单次请求无循环</h2></div><div class="switch" aria-label="流程图请求入口"><button type="button" data-mode="agui" aria-pressed="true">App · AG-UI</button><button type="button" data-mode="normal" aria-pressed="false">普通请求 · JSON</button></div></div>
+      <p class="overview-summary"><strong>没有回到前面节点的边，也没有“模型 → 工具 → 模型”的反复规划循环。</strong>意图路由后，问药图沿固定链路运行至 END；急症通过清空候选影响结果，后续节点仍继续执行。</p>
+      <div class="diagram-wrap"><svg class="agent-diagram" id="agent-diagram" viewBox="0 0 1080 490" role="img" aria-labelledby="diagram-title diagram-description"></svg></div>
+      <p class="diagram-caption" id="diagram-caption" aria-live="polite"></p>
+      <div class="cycle-notes"><p><strong>流式遍历 ≠ 工作流循环</strong><code>async for graph.astream</code> 接收各节点结果，<code>async for llm.chat_stream</code> 接收文本片段；它们不回跳到前面的图节点。</p><p><strong>再次提问 = 新一轮请求</strong>用户追问会重新执行入口与问药图。普通请求可带会话记忆，但不是同一次运行中的自动循环。</p><p><strong>失败回退 ≠ 图中的回边</strong>普通 NDJSON 流失败时，客户端可再次调用 JSON consult；AG-UI 没有同样回退。这是另一次调用，不是节点闭环。</p></div>
+      <div class="ref" style="margin-top:14px">依据：agent/app/graph/builder.py:18 · agent/app/api/consult.py:148 / 366 / 414 · backend/src/domains/family-doctor/agent-client/agent-client.service.ts:111</div>
+    </section>
+    <section id="flow">
+      <div class="section-head"><div><div class="eyebrow">01 / Runtime path</div><h2>点开每一步，查看实际输入与输出</h2><p>默认是 App 当前使用的 AG-UI 入口。切换入口可对照执行顺序与记忆差异。</p></div><div class="switch" aria-label="请求入口"><button type="button" data-mode="agui" aria-pressed="true">App · AG-UI</button><button type="button" data-mode="normal" aria-pressed="false">普通请求 · JSON</button></div></div>
+      <div class="flow-layout"><div class="steps" id="steps" aria-label="流程步骤"></div><article class="detail" id="detail" aria-live="polite"></article></div>
+      <div class="mode-note" id="mode-note"></div>
+    </section>
+    <section id="retrieval">
+      <div class="section-head"><div><div class="eyebrow">02 / Candidate retrieval</div><h2>“找药”实际发生在后端 SQL 中</h2><p>在 Agent 意图路由之前完成，检索目标是 household_medicine_inventory。</p></div></div>
+      <div class="retrieval"><article class="panel"><h3>三种信号混合排序</h3><div class="formula">score = <span>0.55</span> × 全文得分<br>　　　 + <span>0.35</span> × 向量相似度<br>　　　 + <span>0.10</span> × 关键词命中</div><p class="quiet">全文：<code>ts_rank_cd</code> + <code>plainto_tsquery('simple', query)</code>。向量：<code>1 − cosine_distance</code>。关键词：药名、适应症、别名是否 <code>ILIKE '%完整查询串%'</code>。</p><hr><p class="quiet">向量来自本地确定性特征哈希：词与中文字 → SHA-256 → 384 维带符号累加 → L2 归一化。这里没有调用外部 Embedding 模型。</p><div class="ref">backend/src/domains/family-doctor/search/embedding.util.ts:27</div></article>
+      <article class="panel"><h3>召回范围与门槛</h3><div class="table-wrap"><table><thead><tr><th>条件</th><th>当前实现</th></tr></thead><tbody><tr><td>所属范围</td><td>当前 <code>householdId</code>，未软删除，<code>quantity &gt; 0</code></td></tr><tr><td>有查询串</td><td>全文 / 药名 / 适应症 / 别名命中，或 embedding 非空即可进入排序；最多 20 条。</td></tr><tr><td>无查询串</td><td>按更新时间倒序取最多 500 条。正常聊天有问题文本，通常进入有查询分支。</td></tr><tr><td>排序</td><td><code>searchScore DESC</code>，再按 <code>updated_at DESC</code></td></tr><tr><td>有效期</td><td>SQL 没有按 <code>expire_at</code> 过滤；传给 Agent 的药品摘要也不含有效期。</td></tr><tr><td>返回标识</td><td>当前 <code>medicineId</code> 对应家庭库存记录的 <code>i.id</code>。</td></tr></tbody></table></div></article></div>
+      <details><summary>为什么看起来不相关的药，也可能进入候选？</summary><p>SQL 的 OR 条件包含 <code>i.embedding IS NOT NULL</code>，因此有向量的库存记录可以进入排序，而非必须命中词语。当前 SQL 没有相似度阈值。随后 match 保留召回结果，真正的适配过滤由 review 中的 LLM 与硬规则完成。20 条上限是后端候选上限，不是最终推荐数量。</p></details>
+    </section>
+    <section id="boundaries">
+      <div class="section-head"><div><div class="eyebrow">03 / Branches & implementation boundaries</div><h2>读代码时，最容易误解的地方</h2><p>以下描述当前行为，并不代表已经补齐的产品能力。</p></div></div>
+      <div class="boundaries">
+        <article class="boundary"><span class="number">A / 同一条问药图</span><h3>查药与咨询共用工作流</h3><p><code>medicine_search</code> 和 <code>medicine_consult</code> 都进入同一 LangGraph。没有独立的“只列出库存”分支。路由为查药/咨询时，即使置信度低或 needsClarification=true，当前分支判断也会继续进入图。</p></article>
+        <article class="boundary"><span class="number">B / 急症分支</span><h3>清空候选，再走到固定回复</h3><p>LLM 急症标记或规则关键词命中 → match 的候选变为空 → review 不调用模型 → render 使用固定急症文案、推荐为空。图仍顺序执行后续节点，没有条件边直接跳到 END。</p></article>
+        <article class="boundary warning"><span class="number">C / 处方药开关</span><h3>允许开关不解除规则否决</h3><p><code>allowRxRecommendation</code> 会传给 review Prompt；但 <code>hard_block_reasons</code> 无条件否决 RX。儿童、孕期、哺乳期也会否决候选推荐。老人标记本身生成警告，并非无条件否决。</p></article>
+        <article class="boundary warning"><span class="number">D / 多轮记忆接入</span><h3>AG-UI 与普通请求尚未对齐</h3><p>普通 ask 加载记忆、扩展检索串并保存返回摘要。AG-UI 后端仅用本轮问题检索；虽然 recent history 被传给路由器，但图初始化不含 history_messages / session_summary / conversation_status，生成摘要也没有回传保存。</p></article>
+        <article class="boundary"><span class="number">E / 文件存在 ≠ 已执行</span><h3>Top 5 搜索、rank、risk 没有接入</h3><p><code>medicine_search.py</code> 中的 <code>search_medicines</code>（Top 5、0.32 阈值）当前没有调用方。<code>rank.py</code> / <code>risk.py</code> 未注册到 builder。该搜索文件只有症状别名字典被 safety_tools 使用。</p></article>
+        <article class="boundary"><span class="number">F / 空结果与失败</span><h3>没有候选会返回固定文案</h3><p>无候选或全部被拒绝 → recommends=[]，render 不调用模型，返回未找到匹配药品的固定回复。AG-UI 异常转 RUN_ERROR；普通 NDJSON 流客户端失败可回退到 JSON consult，AG-UI 没有同样的回退。</p></article>
+      </div>
+      <details><summary>最终文字回复包含完整药品信息吗？</summary><p>当前 render 的模型输入只有症状、严重度、候选数量和安全审核警告，未传入逐药名称、剂量与审查原因。药名、适应症、理由、警告通过独立的 <code>recommends</code> 结构返回，用于 App 卡片；不能把自然语言回复与药品卡片当作同一份数据。</p></details>
+      <details><summary>状态提示真的表示某一步刚开始吗？</summary><p>AG-UI 在 <code>graph.astream(..., stream_mode="updates")</code> 返回节点结果后，才发送对应 STEP_STARTED 与状态文案。因此这些提示更多是在报告已返回的阶段；不要用状态到达时间推算节点真实起点。trace 中的 latencyMs 来自节点内部计时。</p></details>
+    </section>
+    <section id="sources"><div class="section-head"><div><div class="eyebrow">04 / Source map</div><h2>回到源码核对</h2><p>路径以仓库根目录为基准，行号对应本次读取的工作区。复制后可在编辑器定位。</p></div></div><div class="sources" id="source-list"></div></section>
+    <footer><span>Family Doctor / Agent 查药流程</span><span>依据源码整理；交互用于浏览调用链，不执行真实医疗咨询。</span></footer>
+  </main>
+  <script>
+    "use strict";
+    const stepData = {
+      input: { title:"App 发起提问", symbol:"askAgUiStream / ask", type:"App", intro:"把当前输入变成一次 Agent 请求，同时先创建等待中的助手消息。", input:"question、sessionId、allowRxRecommendation", output:"RunAgentInput 或 AskConsultationDto", bullets:["当前 App 的聊天 store 调用 askAgUiStream；本轮 messages 里发送一条 user 消息。","AG-UI 通过 HttpAgent 请求 /consultation/ag-ui；state 与 forwardedProps 带会话、处方药开关及音频选项。","普通 JSON 对照入口为 /consultation/ask，并非当前 App 聊天的默认调用。"], code:"App store → appApi.askAgUiStream\n→ HttpAgent.runAgent\n→ POST /consultation/ag-ui", refs:[["app/src/stores/useAppStore.ts",757],["app/src/shared/api/http-client.ts",297]] },
+      retrieval: { title:"后端准备药箱与资料", symbol:"findAgentBriefsByHousehold", type:"SQL", intro:"真实药品召回在 NestJS 中完成；Python Agent 接收现成的候选列表。", input:"current.householdId + 查询文本", output:"medicines、userProfile、members、history", bullets:["检查已有会话访问权，创建会话并保存本轮用户消息。","并行读取当前家庭药箱候选、当前登录用户健康资料、家庭成员与近期聊天。","AG-UI 用原始 question 检索；普通 ask 用问题 + 会话摘要主诉/话题/症状/提及药品扩展查询串，截取 240 字。","资料是 current.appUserId 对应用户；成员列表用于路由上下文，当前链路没有按问题自动切换到另一成员档案。"], code:"Promise.all([\n  cabinet.findAgentBriefsByHousehold(householdId, query),\n  findAgentUserProfile(appUserId),\n  findAgentMembers(householdId),\n  findRecentMessagesForAgent(sessionId)\n])", refs:[["backend/src/domains/family-doctor/consultation/consultation.service.ts",366],["backend/src/domains/family-doctor/cabinet/cabinet.service.ts",280],["backend/src/domains/family-doctor/consultation/consultation.service.ts",1166]] },
+      router: { title:"LLM 判断业务意图", symbol:"intent_router", type:"LLM", intro:"先判断这句话是查药、咨询、提醒、录入还是其他需求，再决定是否进入问药图。", input:"question、候选摘要、成员、history 最近 4 条、可用摘要", output:"IntentDecision + trace", bullets:["使用 structured 输出 intent、confidence、needsClarification、missingFields 等字段。","medicine_search / medicine_consult → 同一个问药图；创建提醒 → 提醒分支。","录入、资料更新、闲聊或不支持的任务返回对应提示，不进入问药图。","路由模型异常时构造 unsupported、confidence=0、needsClarification=true，返回补充任务类型提示。"], code:"should_run_consult_graph(decision)\n= decision.intent in {\n    'medicine_consult', 'medicine_search'\n  }", refs:[["agent/app/tools/intent_router.py",17],["agent/app/tools/intent_router.py",95],["agent/app/api/consult.py",597]] },
+      preprocess: { title:"规则整理输入文本", symbol:"preprocess", type:"规则", intro:"只做格式规范化，保留原始问题用于理解。", input:"question", output:"normalized_question + changes", bullets:["去首尾空格、合并空白，转换全角数字与标点。","将常见时长词转换为数字表达，如 两天 → 2天。","规范化体温表达，如 38度5 → 38.5℃。","不在这一步用关键词替代 LLM 的症状语义判断。"], code:"question\n→ _normalize_text(question)\n→ normalized_question", refs:[["agent/app/graph/nodes/preprocess.py",92]] },
+      parse: { title:"LLM 结构化症状", symbol:"parse", type:"LLM", intro:"以原始描述为准理解症状，规范化文本作为参考。", input:"originalQuestion、normalizedQuestion、可用 conversationContext", output:"ParsedSymptoms", bullets:["通过 structured 生成症状、持续时间、严重度、急症标记和人群线索。","Prompt 要求结合上下文理解“这个药”“饭前饭后”等省略表达。","普通请求传入 history_messages 与 session_summary；当前 AG-UI 图没有接入这些字段。"], code:"llm.structured(\n  system=PARSE_SYSTEM,\n  user=question_and_context,\n  schema=ParsedSymptoms\n)", refs:[["agent/app/graph/nodes/parse.py",18],["agent/app/api/consult.py",328]] },
+      emergency: { title:"规则检查急症", symbol:"emergency", type:"规则", intro:"LLM 的急症结论与关键词规则共同决定是否停止药品推荐。", input:"normalized_question、parsed.emergency", output:"emergency、emergency_reasons、更新后的 parsed", bullets:["只要 parsed.emergency=true 或问题含规则关键词，就置 emergency=true。","规则包括呼吸困难、胸痛、意识不清、大出血等；这里只是在说明项目代码。","流程不提前结束；match 负责清空候选，render 负责输出固定急症回复。"], code:"is_emergency = parsed.emergency or bool(reasons)\nparsed = parsed.model_copy(\n  update={'emergency': is_emergency}\n)", refs:[["agent/app/graph/nodes/emergency.py",33]] },
+      population: { title:"规则识别特殊人群", symbol:"special_population", type:"规则", intro:"结合健康资料、结构化线索与文本，给审查节点提供风险标记。", input:"user_profile、parsed.population_hints、question、可用摘要", output:"special_population_flags", bullets:["年龄 < 12 标记 child；年龄 ≥ 65 标记 elderly。","基础病非空标记 chronic_disease；问题或资料中的孕期、哺乳线索产生对应标记。","这些标记用于逐药审查、规则否决以及最终安全警告。"], code:"flags = set(parsed.population_hints)\n+ age / chronic disease signals\n+ pregnancy / lactation text signals", refs:[["agent/app/graph/nodes/special_population.py",11]] },
+      match: { title:"保留后端候选药品", symbol:"match", type:"规则", intro:"名字叫匹配节点，但当前实现只准备候选，不做语义硬过滤。", input:"medicines、parsed.emergency、state.emergency", output:"candidates + 候选 trace", bullets:["没有急症 → candidates 就是后端传来的 medicines。","命中急症 → candidates=[]。","这里没有调用 search_medicines；也没有应用 Top 5、0.32 分数阈值或 RX 开关过滤。","有查询时后端最多召回 20 条，review 会接收这些完整候选。"], code:"candidates = (\n  [] if parsed.emergency or state.get('emergency')\n  else medicines\n)", refs:[["agent/app/graph/nodes/match.py",10],["agent/app/tools/medicine_search.py",24]] },
+      review: { title:"LLM 逐药审查 + 规则否决", symbol:"review / apply_review", type:"LLM + 规则", intro:"这是当前药品适配过滤的核心，决定哪些候选可以进入推荐。", input:"问题、症状、档案、风险标记、候选详情、RX 开关", output:"risked 推荐 + review_decisions 拒绝/通过记录", bullets:["有候选才调用 LLM；模型应对每个 medicineId 返回 suitable、reason、rejectReason、warnings。","Prompt 提供药名、OTC/RX、适应症、禁忌、不良反应、剂量，要求只能用输入 ID。","apply_review 忽略未知 ID；模型未返回的候选默认不推荐。","硬规则覆盖模型决定：RX、儿童、孕期、哺乳期、档案与禁忌明确匹配时否决。","合并模型警告与规则警告；只有 suitable 最终为 true 才写入 risked。"], code:"LLM: RiskReviewOutput.items\n→ validate medicineId\n→ hard_block_reasons(...) veto\n→ build_recommendation + merge warnings\n→ risked / review_decisions", refs:[["agent/app/graph/nodes/review.py",23],["agent/app/graph/nodes/review.py",153],["agent/app/tools/safety_tools.py",88],["agent/prompts/review.system.v1.md",1]] },
+      safety: { title:"规则汇总安全风险", symbol:"safety", type:"规则", intro:"汇总风险等级与安全警告；候选否决已经在 review 中完成。", input:"risked、emergency、special_population_flags", output:"risk_level、safety_warnings", bullets:["急症或推荐含 RX → high；其他存在风险标记 → medium；否则 low。","没有推荐且非急症时，添加未找到匹配家庭药箱药品的提示。","该节点不会重新过滤 risked，也不是额外一轮 LLM 审核。"], code:"risk_level, warnings = audit_recommendations(\n  recommends=risked, emergency=emergency, flags=flags\n)", refs:[["agent/app/graph/nodes/safety.py",11],["agent/app/tools/safety_tools.py",123]] },
+      summarize: { title:"规则更新会话摘要", symbol:"summarize", type:"规则", intro:"合并主诉、症状、风险、提及药品与本轮审查记录。", input:"parsed、review_decisions、candidates、可用旧摘要与 recommends", output:"updated_session_summary", bullets:["这是规则节点，没有再调用模型做摘要。","普通 JSON 图在 render 后执行，此时已经拥有 recommends；返回 sessionSummary 后由后端保存。","流式图 include_render=false，在输出 render 之前执行；此时 state 尚未写入最终 recommends，推荐药摘要可能缺失。","AG-UI 还没有把 updated_session_summary 回传或写入会话记忆。"], code:"普通 JSON: safety → render → summarize\nAG-UI:     safety → summarize → END\n           → API 层 build_render_plan / chat_stream", refs:[["agent/app/graph/nodes/summarize.py",11],["agent/app/graph/builder.py",18],["agent/app/main.py",24]] },
+      render: { title:"生成最终回复与推荐结构", symbol:"render / build_render_plan", type:"LLM / 固定", intro:"根据急症与推荐结果选择固定文案，或调用模型组织文字。", input:"parsed、risked、safety_warnings", output:"answer、recommends、disclaimer", bullets:["急症 → 固定急症文案 + recommends=[]，跳过回复模型。","无 risked → 固定未找到匹配药品文案 + recommends=[]，跳过回复模型。","有推荐 → 模型输入症状、严重度、数量、安全警告；药品详情通过 recommends 单独返回。","普通 JSON 在图中调用 llm.chat；AG-UI 在图结束后由 API 层调用 llm.chat_stream。"], code:"if emergency: fixed emergency answer\nelif not risked: fixed no-match answer\nelse: llm.chat / llm.chat_stream\n\nrecommends = risked", refs:[["agent/app/graph/nodes/render.py",36],["agent/app/api/consult.py",390]] },
+      output: { title:"回传、展示与持久化", symbol:"AG-UI events / ConsultResponse", type:"App + DB", intro:"文字与结构化药品推荐通过不同字段到达前端。", input:"answer、recommends、disclaimer、traces", output:"聊天文字、药品卡片、会话消息、agent_trace", bullets:["AG-UI 的 TEXT_MESSAGE_CONTENT 提供文字 delta；STATE_DELTA 回传 answer/recommends/disclaimer/traces；RUN_FINISHED 给最终结果。","App 将 recommends 转为药品卡片，空推荐时展示未匹配提示。","后端保存助手消息、推荐 JSON 与节点 traces；普通 ask 另外更新会话摘要和状态。","AG-UI 运行异常返回 RUN_ERROR；后端 AgentClient 有超时及内部 Token 检查。"], code:"TEXT_MESSAGE_CONTENT → 聊天文字\nSTATE_DELTA /recommends → 药品卡片\nRUN_FINISHED → 最终结果\n\nDB: consultation_message + agent_trace", refs:[["agent/app/api/consult.py",460],["app/src/stores/useAppStore.ts",834],["backend/src/domains/family-doctor/consultation/consultation.service.ts",438],["backend/src/domains/family-doctor/agent-client/agent-client.service.ts",130]] }
+    };
+    const sources = [
+      ["App 聊天主入口","app/src/stores/useAppStore.ts",757],
+      ["HttpAgent 请求 /consultation/ag-ui","app/src/shared/api/http-client.ts",297],
+      ["普通 ask / 当前 AG-UI 编排","backend/src/domains/family-doctor/consultation/consultation.service.ts",208],
+      ["家庭库存 SQL 召回","backend/src/domains/family-doctor/cabinet/cabinet.service.ts",280],
+      ["384 维确定性特征哈希","backend/src/domains/family-doctor/search/embedding.util.ts",27],
+      ["意图分类与问药分支","agent/app/tools/intent_router.py",17],
+      ["LangGraph 节点注册与顺序","agent/app/graph/builder.py",18],
+      ["候选准备（没有 Top 5 过滤）","agent/app/graph/nodes/match.py",10],
+      ["逐药审查与审查结果落地","agent/app/graph/nodes/review.py",23],
+      ["规则否决与安全汇总","agent/app/tools/safety_tools.py",88],
+      ["固定文案与回复计划","agent/app/graph/nodes/render.py",36],
+      ["AG-UI 流式输出、输入映射与路由","agent/app/api/consult.py",232],
+      ["会话摘要合并","agent/app/graph/nodes/summarize.py",11]
+    ];
+    const rootPath = "C:/Users/Ankkaya/Projects/family-doctor/";
+    let mode = "agui";
+    let selected = "retrieval";
+    const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (char) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
+    const getOrder = () => ["input","retrieval","router","preprocess","parse","emergency","population","match","review","safety",...(mode === "agui" ? ["summarize","render"] : ["render","summarize"]),"output"];
+    const stepsEl = document.getElementById("steps");
+    const detailEl = document.getElementById("detail");
+    const diagramEl = document.getElementById("agent-diagram");
+    function renderDiagram() {
+      const row2 = ["preprocess","parse","emergency","population"];
+      const row3 = [mode === "agui" ? "summarize" : "render","safety","review","match"];
+      const row4 = mode === "agui" ? ["graph-end","render","output","request-end"] : ["summarize","graph-end","output","request-end"];
+      const captions = { input:"请求入口", retrieval:"家庭库存 SQL 召回", router:"LLM · intent_router", preprocess:"规则 · 格式规范化", parse:"LLM · 症状结构化", emergency:"规则 · 标记急症", population:"规则 · 特殊人群标记", match:"急症：[]；其他：保留候选", review:"LLM 判断 + 规则否决", safety:"规则 · 风险与警告", summarize:"规则 · 摘要合并", render:mode === "agui" ? "图外 API 层 · 流式 / 固定文案" : "图内 · LLM / 固定文案", output:"文字 + 药品卡片 + 保存", "graph-end":"LangGraph 运行结束", "request-end":"本次请求完成", other:"提醒处理 / 入口提示 → 返回" };
+      const titles = { input:"App 提问", retrieval:"后端准备候选", router:"判断任务意图", preprocess:"preprocess", parse:"parse", emergency:"emergency", population:"special_population", match:"match", review:"review", safety:"safety", summarize:"summarize", render:"render", output:"回传与持久化", "graph-end":"END", "request-end":"请求结束", other:"其他任务分支" };
+      const nodes = [];
+      ["input","retrieval","router","other"].forEach((id,i) => nodes.push({id,x:35 + i * 260,y:35}));
+      row2.forEach((id,i) => nodes.push({id,x:35 + i * 260,y:180}));
+      row3.forEach((id,i) => nodes.push({id,x:35 + i * 260,y:285}));
+      row4.forEach((id,i) => nodes.push({id,x:35 + i * 260,y:390}));
+      const arrow = (path) => `<path class="flow-edge" d="${path}" marker-end="url(#diagram-arrow)"/>`;
+      const rightEdges = (y) => [255,515,775].map((x) => arrow(`M ${x} ${y} H ${x + 40}`)).join("");
+      const leftEdges = [815,555,295].map((x) => arrow(`M ${x} 317.5 H ${x - 40}`)).join("");
+      const nodeMarkup = nodes.map(({id,x,y}) => {
+        const isInteractive = Boolean(stepData[id]);
+        const type = id === "graph-end" || id === "request-end" || id === "other" ? "node-terminal" : ["router","parse","review"].includes(id) ? "node-llm" : "";
+        const content = `<rect class="node-box" x="${x}" y="${y}" width="220" height="65" rx="10"/><text class="node-title" x="${x + 110}" y="${y + 26}" text-anchor="middle">${escapeHtml(titles[id])}</text><text class="node-caption" x="${x + 110}" y="${y + 47}" text-anchor="middle">${escapeHtml(captions[id])}</text>`;
+        return isInteractive ? `<a href="#flow" data-step="${id}" class="${type} ${selected === id ? "node-selected" : ""}" aria-label="查看 ${escapeHtml(stepData[id].title)}">${content}</a>` : `<g class="${type}">${content}</g>`;
+      }).join("");
+      diagramEl.innerHTML = `<title id="diagram-title">${mode === "agui" ? "AG-UI" : "普通 JSON"} Agent 无循环流程图</title><desc id="diagram-description">App 提问，后端检索，LLM 路由；其他任务处理后返回。查药与咨询依次经过 preprocess、parse、emergency、special_population、match、review、safety，${mode === "agui" ? "summarize、END，图外 render" : "render、summarize、END"}，然后回传与持久化并结束请求。所有箭头均指向后续步骤，没有回边。急症只清空候选，不改变图的顺序。</desc><defs><marker id="diagram-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 8 4 L 0 8 Z" fill="var(--muted)"/></marker></defs>${arrow("M 255 67.5 H 295")}${arrow("M 515 67.5 H 555")}${arrow("M 775 67.5 H 815")}<text class="edge-caption" x="925" y="123" text-anchor="middle">非查药 / 咨询：处理后返回</text>${arrow("M 665 100 V 140 H 145 V 180")}<text class="edge-caption" x="385" y="132" text-anchor="middle">查药 / 咨询 → 进入固定问药图</text>${rightEdges(212.5)}${arrow("M 925 245 V 285")}${leftEdges}${arrow("M 145 350 V 390")}${rightEdges(422.5)}${nodeMarkup}`;
+      document.getElementById("diagram-caption").textContent = `${mode === "agui" ? "AG-UI：summarize → END → 图外 render。" : "普通 JSON：render → summarize → END。"}方框可点击查看步骤详情；右上方是路由返回分支。急症仍沿主链执行。窄屏可横向滑动流程图。`;
+    }
+    function render() {
+      const order = getOrder();
+      const index = order.indexOf(selected);
+      const item = stepData[selected];
+      stepsEl.innerHTML = order.map((id,i) => `<button class="step" type="button" data-step="${id}" aria-pressed="${id === selected}" aria-controls="detail"><span class="step-number">${String(i + 1).padStart(2,"0")}</span><span><span class="step-title">${escapeHtml(stepData[id].title)}</span><span class="step-sub">${escapeHtml(stepData[id].symbol)}</span></span><span class="tag ${stepData[id].type.includes("LLM") ? "" : "rule"}">${escapeHtml(stepData[id].type)}</span></button>`).join("");
+      detailEl.innerHTML = `<div class="detail-top"><span class="eyebrow">Step ${String(index + 1).padStart(2,"0")} / ${order.length}</span><span class="tag">${escapeHtml(item.type)}</span></div><h3>${escapeHtml(item.title)}</h3><p class="detail-intro">${escapeHtml(item.intro)}</p><div class="io"><div><span class="small-label">Input / 输入</span><p>${escapeHtml(item.input)}</p></div><div><span class="small-label">Output / 输出</span><p>${escapeHtml(item.output)}</p></div></div><ul>${item.bullets.map((text) => `<li>${escapeHtml(text)}</li>`).join("")}</ul><span class="small-label">代码逻辑摘要（非完整源码）</span><pre><code>${escapeHtml(item.code)}</code></pre><div class="refs"><span class="small-label">Source / 源码位置</span>${item.refs.map(([path,line]) => `<span class="ref">${escapeHtml(path)}:${line}</span>`).join("")}</div><div class="detail-bottom"><button class="control" type="button" data-action="prev" ${index === 0 ? "disabled" : ""}>← 上一步</button><span class="quiet">${mode === "agui" ? "AG-UI · App 当前入口" : "JSON · 普通请求对照"}</span><button class="control primary" type="button" data-action="next" ${index === order.length - 1 ? "disabled" : ""}>下一步 →</button></div>`;
+      document.getElementById("mode-note").textContent = mode === "agui" ? "AG-UI 执行顺序：preprocess → parse → emergency → special_population → match → review → safety → summarize → 图结束 → API 层 render。当前入口的会话摘要尚未回传保存。" : "普通 JSON 执行顺序：preprocess → parse → emergency → special_population → match → review → safety → render → summarize。后端扩展检索串，并传递、保存会话记忆。NDJSON 流同 AG-UI 在图结束后 render，摘要生成也先于最终 recommends。";
+      document.querySelectorAll("[data-mode]").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.mode === mode)));
+      renderDiagram();
+    }
+    diagramEl.addEventListener("click", (event) => { const link = event.target.closest("[data-step]"); if (link) { selected = link.dataset.step; render(); } });
+    stepsEl.addEventListener("click", (event) => { const button = event.target.closest("[data-step]"); if (button) { selected = button.dataset.step; render(); } });
+    detailEl.addEventListener("click", (event) => { const button = event.target.closest("[data-action]"); if (!button || button.disabled) return; const order = getOrder(); selected = order[order.indexOf(selected) + (button.dataset.action === "next" ? 1 : -1)]; render(); });
+    document.querySelectorAll("[data-mode]").forEach((button) => button.addEventListener("click", () => { mode = button.dataset.mode; render(); }));
+    const sourceList = document.getElementById("source-list");
+    sourceList.innerHTML = sources.map(([title,path,line],index) => `<div class="source-row"><div><strong>${escapeHtml(title)}</strong><code>${escapeHtml(path)}:${line}</code></div><button class="control copy" type="button" data-copy="${index}" aria-label="复制 ${escapeHtml(title)} 的绝对路径及行号">复制位置</button></div>`).join("");
+    sourceList.addEventListener("click", async (event) => {
+      const button = event.target.closest("[data-copy]");
+      if (!button) return;
+      const [,path,line] = sources[Number(button.dataset.copy)];
+      const location = rootPath + path + ":" + line;
+      try { await navigator.clipboard.writeText(location); button.textContent = "已复制"; setTimeout(() => { button.textContent = "复制位置"; },1800); }
+      catch { button.textContent = "请复制下方位置"; const value = document.createElement("textarea"); value.value = location; value.readOnly = true; value.style.width = "100%"; button.closest(".source-row").append(value); value.select(); }
+    });
+    render();
+  </script>
+</body>
+</html>

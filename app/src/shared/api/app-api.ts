@@ -25,6 +25,7 @@ type BackendMedicine = {
   dosage: string | null;
   barcode: string | null;
   approvalNumber: string | null;
+  manufacturer?: string | null;
   quantity?: number;
   expireAt?: string | null;
   source?: string | null;
@@ -58,6 +59,7 @@ export type CabinetMedicineInput = {
   barcode?: string | null;
   approvalNumber?: string | null;
   quantity?: number;
+  manufacturer?: string | null;
   expireAt?: string;
   source?: string;
   notes?: string;
@@ -452,6 +454,9 @@ function toAppMedicine(item: BackendMedicine): Medicine {
     adverseReactions: item.adverseReaction || "暂无不良反应记录",
     otc: item.otc === "RX" ? "Rx" : "OTC",
     barcode: item.barcode || "-",
+    manufacturer: item.manufacturer?.trim() || undefined,
+    approvalNumber: item.approvalNumber?.trim() || undefined,
+    dosage: item.dosage?.trim() || undefined,
     source: item.source || "未记录",
     quantity: item.quantity,
   };

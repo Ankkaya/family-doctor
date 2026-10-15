@@ -1,7 +1,7 @@
 import { Type } from 'class-transformer';
 import { IsArray, IsEnum, IsInt, IsISO8601, IsOptional, IsString, Max, Min } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { MedicineOtcType } from '../../medicine/dto/upsert-medicine.dto';
+import { OtcType as MedicineOtcType } from '@prisma/client';
 
 export class UpdateCabinetInventoryDto {
   @ApiPropertyOptional({ description: '药品名称' })
@@ -49,6 +49,11 @@ export class UpdateCabinetInventoryDto {
   @IsOptional()
   @IsString()
   approvalNumber?: string;
+
+  @ApiPropertyOptional({ description: '生产厂家' })
+  @IsOptional()
+  @IsString()
+  manufacturer?: string;
 
   @ApiPropertyOptional({ minimum: 1, maximum: 999 })
   @IsOptional()

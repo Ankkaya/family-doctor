@@ -2899,74 +2899,6 @@
         ]
       }
     },
-    "/medicine/catalog": {
-      "get": {
-        "operationId": "MedicineController_findCatalog",
-        "parameters": [
-          {
-            "name": "keyword",
-            "required": false,
-            "in": "query",
-            "description": "搜索关键字，匹配名称、别名或适应症",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "pageSize",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "maximum": 100,
-              "default": 20,
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "App 查询药品目录",
-        "tags": [
-          "家庭医生/药品目录"
-        ]
-      }
-    },
-    "/medicine/catalog/{id}": {
-      "get": {
-        "operationId": "MedicineController_findOne",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "summary": "App 查询药品详情",
-        "tags": [
-          "家庭医生/药品目录"
-        ]
-      }
-    },
     "/medicine/recognize-images": {
       "post": {
         "operationId": "MedicineController_recognizeImages",
@@ -2983,150 +2915,7 @@
         ],
         "summary": "App 识别药盒图片并提取药品信息",
         "tags": [
-          "家庭医生/药品目录"
-        ]
-      }
-    },
-    "/admin/medicine": {
-      "get": {
-        "operationId": "MedicineController_findAdminCatalog",
-        "parameters": [
-          {
-            "name": "keyword",
-            "required": false,
-            "in": "query",
-            "description": "搜索关键字，匹配名称、别名或适应症",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "default": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "pageSize",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "maximum": 100,
-              "default": 20,
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "后台查询药品目录",
-        "tags": [
-          "家庭医生/药品目录"
-        ]
-      },
-      "post": {
-        "operationId": "MedicineController_create",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpsertMedicineDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "后台新增药品",
-        "tags": [
-          "家庭医生/药品目录"
-        ]
-      }
-    },
-    "/admin/medicine/{id}": {
-      "patch": {
-        "operationId": "MedicineController_update",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpsertMedicineDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "后台更新药品",
-        "tags": [
-          "家庭医生/药品目录"
-        ]
-      },
-      "delete": {
-        "operationId": "MedicineController_remove",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "后台删除药品",
-        "tags": [
-          "家庭医生/药品目录"
+          "家庭医生/药品识别"
         ]
       }
     },
@@ -5085,59 +4874,6 @@
           "value"
         ]
       },
-      "UpsertMedicineDto": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "description": "药品名称"
-          },
-          "aliases": {
-            "description": "别名/通用名/商品名",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "otc": {
-            "type": "string",
-            "enum": [
-              "OTC",
-              "RX"
-            ],
-            "description": "分类：OTC(非处方药) 或 RX(处方药)"
-          },
-          "indication": {
-            "type": "string",
-            "description": "适应症"
-          },
-          "contraindication": {
-            "type": "string",
-            "description": "禁忌人群"
-          },
-          "adverseReaction": {
-            "type": "string",
-            "description": "不良反应"
-          },
-          "dosage": {
-            "type": "string",
-            "description": "用法用量"
-          },
-          "barcode": {
-            "type": "string",
-            "description": "条形码"
-          },
-          "approvalNumber": {
-            "type": "string",
-            "description": "批准文号"
-          }
-        },
-        "required": [
-          "name",
-          "otc",
-          "indication"
-        ]
-      },
       "CreateCabinetInventoryDto": {
         "type": "object",
         "properties": {
@@ -5183,6 +4919,10 @@
           "approvalNumber": {
             "type": "string",
             "description": "批准文号"
+          },
+          "manufacturer": {
+            "type": "string",
+            "description": "生产厂家"
           },
           "quantity": {
             "type": "number",
@@ -5254,6 +4994,10 @@
           "approvalNumber": {
             "type": "string",
             "description": "批准文号"
+          },
+          "manufacturer": {
+            "type": "string",
+            "description": "生产厂家"
           },
           "quantity": {
             "type": "number",

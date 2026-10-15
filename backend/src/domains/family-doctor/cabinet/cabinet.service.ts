@@ -28,6 +28,7 @@ type CabinetRow = {
   dosage: string | null;
   barcode: string | null;
   approvalNumber: string | null;
+  manufacturer: string | null;
   createdAt: Date | string;
   updatedAt: Date | string;
   quantity: number;
@@ -56,6 +57,7 @@ const SELECT_CABINET_COLUMNS = Prisma.sql`
   i.dosage,
   i.barcode,
   i.approval_number as "approvalNumber",
+  i.manufacturer,
   i.created_at as "createdAt",
   i.updated_at as "updatedAt",
   i.quantity,
@@ -166,6 +168,7 @@ export class CabinetService {
         dosage,
         barcode,
         approval_number,
+        manufacturer,
         quantity,
         expire_at,
         source,
@@ -185,6 +188,7 @@ export class CabinetService {
         ${medicine.dosage},
         ${medicine.barcode},
         ${medicine.approvalNumber},
+        ${medicine.manufacturer},
         ${dto.quantity ?? 1},
         ${expireAt}::date,
         ${source},
@@ -220,6 +224,7 @@ export class CabinetService {
         dosage = COALESCE(${medicine.dosage}, dosage),
         barcode = COALESCE(${medicine.barcode}, barcode),
         approval_number = COALESCE(${medicine.approvalNumber}, approval_number),
+        manufacturer = CASE WHEN ${dto.manufacturer !== undefined} THEN ${medicine.manufacturer} ELSE manufacturer END,
         quantity = COALESCE(${dto.quantity ?? null}, quantity),
         expire_at = COALESCE(${dto.expireAt?.trim() || null}::date, expire_at),
         source = COALESCE(${dto.source?.trim() || null}, source),
@@ -473,6 +478,7 @@ export class CabinetService {
       dosage: dto.dosage?.trim() || null,
       barcode: dto.barcode?.trim() || null,
       approvalNumber: dto.approvalNumber?.trim() || null,
+      manufacturer: dto.manufacturer?.trim() || null,
     };
   }
 
@@ -487,6 +493,7 @@ export class CabinetService {
       dosage: dto.dosage?.trim() || null,
       barcode: dto.barcode?.trim() || null,
       approvalNumber: dto.approvalNumber?.trim() || null,
+      manufacturer: dto.manufacturer?.trim() || null,
     };
   }
 

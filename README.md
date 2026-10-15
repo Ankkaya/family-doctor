@@ -11,6 +11,10 @@
 | `backend/` | 导入的 NestJS + Prisma 后端，作为 App/Admin 的 BFF |
 | `agent/` | Python FastAPI + LangGraph Agent 服务 |
 
+药品资料直接保存在各家庭的 `household_medicine_inventory` 中。手动录入和图片识别结果经用户确认后保存，咨询只检索当前家庭药箱；系统不再维护公共药品目录。
+
+升级已有数据库时，运行 `pnpm --filter platform-template-backend exec prisma migrate deploy`。`20261013000002_remove_medicine_catalog` 迁移保留家庭药品记录及其说明信息，补齐旧关联记录缺失的厂家后，删除公共目录表、目录关联列和后台目录菜单。历史迁移和早期设计文档中的目录描述仅记录旧版本。
+
 ## 调用链路
 
 ```text

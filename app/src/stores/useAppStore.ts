@@ -271,6 +271,7 @@ function toCabinetMedicineInput(medicine: Medicine): CabinetMedicineInput {
     dosage: medicine.dosage,
     barcode: medicine.barcode === "-" ? undefined : medicine.barcode,
     approvalNumber: medicine.approvalNumber,
+    manufacturer: medicine.manufacturer,
     quantity: medicine.quantity ?? 1,
     expireAt: formatApiDate(medicine.expiry),
     source: medicine.source,

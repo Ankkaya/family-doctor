@@ -122,6 +122,7 @@ export function MedicineDetail({
       <SectionCard title="来源信息">
         <div className="grid gap-3 text-sm text-slate-700 dark:text-slate-300">
           <InfoRow label="条形码" value={medicine.barcode} />
+          <InfoRow label="生产厂家" value={medicine.manufacturer || "未记录"} />
           <InfoRow label="数量" value={medicine.quantity ? String(medicine.quantity) : "未记录"} />
           <InfoRow label="分类" value={formatMedicineCategory(medicine.otc)} />
           <InfoRow label="录入方式" value={medicine.source} />
@@ -131,6 +132,7 @@ export function MedicineDetail({
         <SectionCard title="编辑药品">
           <div className="space-y-3">
             <EditField label="药品名称" value={draft.name} onChange={(value) => setDraft({ ...draft, name: value })} />
+            <EditField label="生产厂家" value={draft.manufacturer ?? ""} onChange={(value) => setDraft({ ...draft, manufacturer: value })} />
             <EditField label="有效期" value={draft.expiry} onChange={(value) => setDraft({ ...draft, expiry: value })} />
             <label className="block text-sm">
               <span className="mb-2 block text-slate-500 dark:text-slate-400">分类</span>

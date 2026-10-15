@@ -198,25 +198,6 @@ model UploadRecord {
 
 // ==================== 家庭医生 MVP ====================
 
-model MedicineCatalog {
-  id               String   @id @default(cuid())
-  name             String
-  aliases          String[] @default([])
-  otc              OtcType
-  indication       String
-  contraindication String?
-  adverseReaction  String?  @map("adverse_reaction")
-  dosage           String?
-  barcode          String?  @unique
-  approvalNumber   String?  @map("approval_number")
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
-  householdInventories HouseholdMedicineInventory[]
-
-  @@index([name])
-  @@map("medicine_catalog")
-}
-
 model AppUser {
   id                 String    @id @default(cuid())
   username           String?
@@ -291,7 +272,6 @@ model HouseholdMember {
 model HouseholdMedicineInventory {
   id          String          @id @default(cuid())
   householdId String          @map("household_id")
-  medicineId  String?         @map("medicine_id")
   name        String
   aliases     String[]        @default([])
   otc         OtcType
@@ -301,6 +281,7 @@ model HouseholdMedicineInventory {
   dosage      String?
   barcode     String?
   approvalNumber String?     @map("approval_number")
+  manufacturer String?
   quantity    Int             @default(1)
   expireAt    DateTime?       @map("expire_at") @db.Date
   source      String?
@@ -311,11 +292,9 @@ model HouseholdMedicineInventory {
   deletedAt   DateTime?       @map("deleted_at")
 
   household   Household       @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  medicine    MedicineCatalog? @relation(fields: [medicineId], references: [id], onDelete: SetNull)
   creator     AppUser?        @relation("HouseholdInventoryCreator", fields: [createdBy], references: [id], onDelete: SetNull)
 
   @@index([householdId])
-  @@index([medicineId])
   @@index([createdBy])
   @@index([expireAt])
   @@index([deletedAt])

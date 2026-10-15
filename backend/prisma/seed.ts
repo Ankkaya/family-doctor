@@ -173,9 +173,6 @@ async function main() {
     { id: 143, name: '新增字典项', permission: 'system:dictionary:item:create', parentId: 16, order: 4 },
     { id: 144, name: '编辑字典项', permission: 'system:dictionary:item:update', parentId: 16, order: 5 },
     { id: 145, name: '删除字典项', permission: 'system:dictionary:item:delete', parentId: 16, order: 6 },
-    { id: 300, name: '新增药品', permission: 'family-doctor:medicine:create', parentId: 31, order: 1 },
-    { id: 301, name: '编辑药品', permission: 'family-doctor:medicine:update', parentId: 31, order: 2 },
-    { id: 302, name: '删除药品', permission: 'family-doctor:medicine:delete', parentId: 31, order: 3 },
     { id: 303, name: '更新家庭药箱', permission: 'family-doctor:household-medicine:update', parentId: 34, order: 1 },
     { id: 304, name: '删除家庭药箱', permission: 'family-doctor:household-medicine:delete', parentId: 34, order: 2 },
     { id: 305, name: '启停 App 用户', permission: 'family-doctor:app-user:update', parentId: 35, order: 1 },
@@ -387,68 +384,26 @@ async function main() {
     },
   ];
 
-  for (const item of medicineSeeds) {
-    await prisma.$executeRaw`
-      INSERT INTO medicine_catalog (
-        id,
-        name,
-        aliases,
-        otc,
-        indication,
-        contraindication,
-        adverse_reaction,
-        dosage,
-        barcode,
-        approval_number
-      )
-      VALUES (
-        ${item.id},
-        ${item.name},
-        ${item.aliases},
-        ${item.otc}::"OtcType",
-        ${item.indication},
-        ${item.contraindication},
-        ${item.adverseReaction},
-        ${item.dosage},
-        ${item.barcode},
-        ${item.approvalNumber}
-      )
-      ON CONFLICT (id) DO UPDATE SET
-        name = EXCLUDED.name,
-        aliases = EXCLUDED.aliases,
-        otc = EXCLUDED.otc,
-        indication = EXCLUDED.indication,
-        contraindication = EXCLUDED.contraindication,
-        adverse_reaction = EXCLUDED.adverse_reaction,
-        dosage = EXCLUDED.dosage,
-        barcode = EXCLUDED.barcode,
-        approval_number = EXCLUDED.approval_number,
-        updated_at = now()
-    `;
-  }
-
-  console.log('✅ 家庭医生药品种子数据初始化完成:', medicineSeeds.length, '条');
-
   const inventorySeeds = [
     {
+      ...medicineSeeds[0],
       id: 'inv-local-dev-med-ibu',
-      medicineId: 'med-ibu',
       quantity: 1,
       expireAt: '2026-12-31',
       source: '手动录入',
       notes: '家庭常备退热止痛药',
     },
     {
+      ...medicineSeeds[1],
       id: 'inv-local-dev-med-lhqw',
-      medicineId: 'med-lhqw',
       quantity: 1,
       expireAt: '2025-11-20',
       source: '图片识别',
       notes: '示例库存',
     },
     {
+      ...medicineSeeds[3],
       id: 'inv-local-dev-med-hxzq',
-      medicineId: 'med-hxzq',
       quantity: 2,
       expireAt: '2026-08-05',
       source: '条码录入',
@@ -536,7 +491,6 @@ async function main() {
       INSERT INTO household_medicine_inventory (
         id,
         household_id,
-        medicine_id,
         name,
         aliases,
         otc,
@@ -552,29 +506,26 @@ async function main() {
         notes,
         created_by
       )
-      SELECT
+      VALUES (
         ${`hh-${item.id}`},
         'local-dev-household',
-        m.id,
-        m.name,
-        m.aliases,
-        m.otc,
-        m.indication,
-        m.contraindication,
-        m.adverse_reaction,
-        m.dosage,
-        m.barcode,
-        m.approval_number,
+        ${item.name},
+        ${item.aliases},
+        ${item.otc}::"OtcType",
+        ${item.indication},
+        ${item.contraindication},
+        ${item.adverseReaction},
+        ${item.dosage},
+        ${item.barcode},
+        ${item.approvalNumber},
         ${item.quantity},
         ${item.expireAt}::date,
         ${item.source},
         ${item.notes},
         'local-dev-user'
-      FROM medicine_catalog m
-      WHERE m.id = ${item.medicineId}
+      )
       ON CONFLICT (id) DO UPDATE SET
         household_id = EXCLUDED.household_id,
-        medicine_id = EXCLUDED.medicine_id,
         name = EXCLUDED.name,
         aliases = EXCLUDED.aliases,
         otc = EXCLUDED.otc,

@@ -1,18 +1,3 @@
-export type MedicineCatalogItem = {
-  id: string;
-  name: string;
-  aliases: string[];
-  otc: 'OTC' | 'RX';
-  indication: string;
-  contraindication: string | null;
-  adverseReaction: string | null;
-  dosage: string | null;
-  barcode: string | null;
-  approvalNumber: string | null;
-  createdAt: Date | string;
-  updatedAt: Date | string;
-};
-
 export type RecognizedMedicineItem = {
   name: string;
   aliases: string[];

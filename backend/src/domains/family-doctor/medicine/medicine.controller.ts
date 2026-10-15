@@ -1,14 +1,9 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Controller, Post, Req, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
-import { PermissionsGuard } from '@/auth/guards/permissions.guard';
-import { RequirePermissions } from '@/auth/decorators/permissions.decorator';
 import { BufferedFile } from '@/infrastructure/minio/dto/file.dto';
 import { AppJwtAuthGuard } from '@/domains/app-auth/guards/app-jwt-auth.guard';
 import { RateLimitService } from '@/infrastructure/redis/rate-limit.service';
-import { QueryMedicineDto } from './dto/query-medicine.dto';
-import { UpsertMedicineDto } from './dto/upsert-medicine.dto';
 import { MedicineService } from './medicine.service';
 
 type AppRequest = {
@@ -17,7 +12,7 @@ type AppRequest = {
   };
 };
 
-@ApiTags('家庭医生/药品目录')
+@ApiTags('家庭医生/药品识别')
 @Controller()
 export class MedicineController {
   private static readonly ALLOWED_IMAGE_TYPES = new Set([
@@ -33,18 +28,6 @@ export class MedicineController {
     private readonly rateLimit: RateLimitService,
   ) {}
 
-  @Get('medicine/catalog')
-  @ApiOperation({ summary: 'App 查询药品目录' })
-  findCatalog(@Query() query: QueryMedicineDto) {
-    return this.medicineService.findCatalog(query);
-  }
-
-  @Get('medicine/catalog/:id')
-  @ApiOperation({ summary: 'App 查询药品详情' })
-  findOne(@Param('id') id: string) {
-    return this.medicineService.findOne(id);
-  }
-
   @Post('medicine/recognize-images')
   @UseGuards(AppJwtAuthGuard)
   @ApiBearerAuth()
@@ -57,42 +40,6 @@ export class MedicineController {
     await this.rateLimit.assertWithinLimit('medicine-recognition', req.user.appUserId, 10, 3600);
     this.validateRecognitionFiles(files);
     return this.medicineService.recognizeFromImages(files);
-  }
-
-  @Get('admin/medicine')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions('family-doctor:medicine:view')
-  @ApiBearerAuth()
-  @ApiOperation({ summary: '后台查询药品目录' })
-  findAdminCatalog(@Query() query: QueryMedicineDto) {
-    return this.medicineService.findCatalog(query);
-  }
-
-  @Post('admin/medicine')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions('family-doctor:medicine:create')
-  @ApiBearerAuth()
-  @ApiOperation({ summary: '后台新增药品' })
-  create(@Body() dto: UpsertMedicineDto) {
-    return this.medicineService.create(dto);
-  }
-
-  @Patch('admin/medicine/:id')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions('family-doctor:medicine:update')
-  @ApiBearerAuth()
-  @ApiOperation({ summary: '后台更新药品' })
-  update(@Param('id') id: string, @Body() dto: UpsertMedicineDto) {
-    return this.medicineService.update(id, dto);
-  }
-
-  @Delete('admin/medicine/:id')
-  @UseGuards(JwtAuthGuard, PermissionsGuard)
-  @RequirePermissions('family-doctor:medicine:delete')
-  @ApiBearerAuth()
-  @ApiOperation({ summary: '后台删除药品' })
-  remove(@Param('id') id: string) {
-    return this.medicineService.remove(id);
   }
 
   private validateRecognitionFiles(files?: BufferedFile[]) {

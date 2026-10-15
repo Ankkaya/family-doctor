@@ -2,33 +2,6 @@ import api from './request';
 
 export type OtcType = 'OTC' | 'RX';
 
-export interface MedicineCatalogItem {
-  id: string;
-  name: string;
-  aliases: string[];
-  otc: OtcType;
-  indication: string;
-  contraindication: string | null;
-  adverseReaction: string | null;
-  dosage: string | null;
-  barcode: string | null;
-  approvalNumber: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface MedicineForm {
-  name: string;
-  aliases: string[];
-  otc: OtcType;
-  indication: string;
-  contraindication?: string | null;
-  adverseReaction?: string | null;
-  dosage?: string | null;
-  barcode?: string | null;
-  approvalNumber?: string | null;
-}
-
 export interface PageResult<T> {
   items: T[];
   total: number;
@@ -266,22 +239,6 @@ export interface ConsultationDebugRunResult {
   promptCatalog: ConsultationPromptCatalogItem[];
   createdAt: string;
 }
-
-export const getAdminMedicines = (params?: { keyword?: string; page?: number; pageSize?: number }) => {
-  return api.get<PageResult<MedicineCatalogItem>>('/admin/medicine', { params });
-};
-
-export const createAdminMedicine = (data: MedicineForm) => {
-  return api.post<MedicineCatalogItem>('/admin/medicine', data);
-};
-
-export const updateAdminMedicine = (id: string, data: MedicineForm) => {
-  return api.patch<MedicineCatalogItem>(`/admin/medicine/${id}`, data);
-};
-
-export const deleteAdminMedicine = (id: string) => {
-  return api.delete<MedicineCatalogItem>(`/admin/medicine/${id}`);
-};
 
 export const getAdminHouseholds = (params?: { keyword?: string; page?: number; pageSize?: number }) => {
   return api.get<PageResult<AdminHousehold>>('/admin/households', { params });

@@ -9,6 +9,7 @@ import { SectionCard } from "@/features/shared-ui/Surface";
 import type { Medicine } from "@/shared/mock/app-data";
 import { cn } from "@/shared/lib/utils";
 import type { ScreenKey } from "@/stores/useAppStore";
+import type { RecognizedMedicineResult } from "@/shared/api/app-api";
 
 export function EntryMethods({ onNavigate }: { onNavigate: (screen: ScreenKey) => void }) {
   const methods: Array<{
@@ -74,7 +75,7 @@ const medicineCategoryOptions: Array<{ label: string; value: Medicine["otc"] }> 
   { label: "RX(处方药)", value: "Rx" },
 ];
 type RecognitionPhase = "idle" | "uploading" | "recognizing" | "finalizing" | "completed" | "failed";
-type RecognitionResultSummary = Medicine & { confidence?: number };
+type RecognitionResultSummary = RecognizedMedicineResult;
 
 export function ManualEntry({
   onSave,
@@ -124,6 +125,7 @@ export function ManualEntry({
       </Button>
       <SectionCard title="基础信息">
         <EditField label="药品名称" value={form.name} onChange={(value) => update("name", value)} />
+        <EditField label="生产厂家" value={form.manufacturer ?? ""} onChange={(value) => update("manufacturer", value)} />
         <EditField label="有效期" value={form.expiry} onChange={(value) => update("expiry", value)} />
         <label className="block text-sm">
           <span className="mb-2 block text-slate-500 dark:text-slate-400">分类</span>
@@ -433,6 +435,9 @@ function RecognitionStatusPanel({
               value={formatConfidence(result.confidence)}
             />
           </div>
+          {result.warnings?.length ? (
+            <p className="mt-3 text-xs leading-5 text-amber-700">识别结果有待核对的信息，请在确认页查看提示。</p>
+          ) : null}
           <Button className="mt-3 h-10 w-full rounded-2xl" onClick={onViewResult}>
             查看并确认
           </Button>
@@ -506,7 +511,7 @@ export function RecognitionConfirm({
   onRetry,
   onSave,
 }: {
-  medicine: Medicine | null;
+  medicine: RecognizedMedicineResult | null;
   onRetry: () => void;
   onSave: (medicine: Medicine) => void;
 }) {
@@ -529,6 +534,13 @@ export function RecognitionConfirm({
 
   return (
     <div className="space-y-4">
+      {medicine?.warnings?.length ? (
+        <SectionCard title="需要核对的信息">
+          <ul className="list-disc space-y-2 pl-5 text-sm leading-6 text-amber-700 dark:text-amber-300">
+            {medicine.warnings.map((warning, index) => <li key={`${index}-${warning}`}>{warning}</li>)}
+          </ul>
+        </SectionCard>
+      ) : null}
       <SectionCard title="结构化识别结果">
         <EditField label="药品名称" value={draft.name} onChange={(value) => setDraft({ ...draft, name: value })} />
         <EditField label="有效期" value={draft.expiry} onChange={(value) => setDraft({ ...draft, expiry: value })} />
@@ -581,7 +593,7 @@ export function RecognitionConfirm({
         />
       </SectionCard>
       <section className="rounded-[1.5rem] border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-        确认后进入药品列表页。
+        请核对并补充识别信息，确认后保存到家庭药箱。
       </section>
       <div className="grid grid-cols-2 gap-3">
         <Button variant="secondary" className="bg-white dark:bg-slate-800" onClick={onRetry}>重新识别</Button>
