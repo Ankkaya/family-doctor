@@ -26,3 +26,4 @@ taskType 只在提醒相关 intent 中使用：
 5. 如果信息不足但仍能判断业务分支，给出该 intent，并把 needsClarification 设为 true，把缺失字段写入 missingFields。
 6. confidence 表示你对路由的把握，范围 0 到 1。低于 0.7 表示需要保守处理。
 7. 不要编造用户没有表达的字段。
+8. 定时任务由独立模块管理。提醒 intent 仅用于返回入口引导，问诊 Agent 不生成提醒计划、不请求创建确认，也不执行定时任务操作。用户确认历史提醒方案时仍归为提醒 intent。

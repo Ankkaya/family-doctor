@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import json
-from typing import Any
 
 from ..llm.provider import LLMProvider
+from ..llm.messages import conversation_history
 from ..prompting import load_prompt
 from ..schemas import ConsultRequest, IntentDecision, TraceStep
 from ..tracing import trace_node
@@ -19,6 +19,7 @@ async def classify_intent(
     llm: LLMProvider,
     payload: ConsultRequest,
 ) -> tuple[IntentDecision, TraceStep | None]:
+    history = conversation_history(payload.history_messages or payload.history)
     user_prompt = json.dumps(
         {
             "question": payload.question,
@@ -39,13 +40,6 @@ async def classify_intent(
                 }
                 for member in payload.members
             ],
-            "history": [
-                {
-                    "role": message.role,
-                    "content": message.content,
-                }
-                for message in payload.history[-4:]
-            ],
             "sessionSummary": (
                 payload.session_summary.model_dump(by_alias=True)
                 if payload.session_summary
@@ -62,6 +56,7 @@ async def classify_intent(
             "promptVersion": INTENT_ROUTER_PROMPT_VERSION,
             "systemPrompt": INTENT_ROUTER_SYSTEM,
             "userPrompt": user_prompt,
+            "historyMessages": history,
         },
     ) as rec:
         try:
@@ -69,6 +64,7 @@ async def classify_intent(
                 system=INTENT_ROUTER_SYSTEM,
                 user=user_prompt,
                 schema=IntentDecision,
+                history=history,
             )
             rec.set_output(decision.model_dump(by_alias=True))
             rec.set_llm(model=llm.model)
@@ -94,18 +90,3 @@ async def classify_intent(
 
 def should_run_consult_graph(decision: IntentDecision) -> bool:
     return decision.intent in MEDICINE_CONSULT_INTENTS
-
-
-def is_create_reminder(decision: IntentDecision) -> bool:
-    return decision.intent == "create_reminder"
-
-
-def route_summary(decision: IntentDecision) -> dict[str, Any]:
-    return {
-        "intent": decision.intent,
-        "confidence": decision.confidence,
-        "taskType": decision.task_type,
-        "needsClarification": decision.needs_clarification,
-        "missingFields": decision.missing_fields,
-        "reason": decision.reason,
-    }

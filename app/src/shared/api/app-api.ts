@@ -196,80 +196,6 @@ export type AppSessionState = {
   households: AppHousehold[];
 };
 
-export type AskConsultationInput = {
-  sessionId?: string;
-  question: string;
-  allowRxRecommendation?: boolean;
-  audio?: {
-    enabled?: boolean;
-    codec?: "mp3" | "wav";
-  };
-};
-
-export type ConsultationRecommend = {
-  medicineId: string;
-  name: string;
-  otc: BackendOtcType;
-  indication: string;
-  reason: string;
-  warnings: string[];
-};
-
-export type AskConsultationResponse = {
-  sessionId: string;
-  messageId: string;
-  answer: string;
-  recommends: ConsultationRecommend[];
-  disclaimer: string;
-};
-
-export type AskConsultationStreamEvent =
-  | {
-      type: "session";
-      sessionId: string;
-      messageId: string;
-    }
-  | {
-      type: "status";
-      stage: "prepare" | "lookup" | "agent" | "fallback" | "finalize";
-      message: string;
-    }
-  | {
-      type: "answer_delta";
-      delta: string;
-    }
-  | {
-      type: "complete";
-      sessionId: string;
-      messageId: string;
-      answer: string;
-      recommends: ConsultationRecommend[];
-      disclaimer: string;
-    }
-  | {
-      type: "audio_meta";
-      codec: "mp3" | "wav";
-      sampleRate: number;
-    }
-  | {
-      type: "audio_chunk";
-      seq: number;
-      text: string;
-      audioBase64: string;
-      codec: "mp3" | "wav";
-    }
-  | {
-      type: "audio_done";
-    }
-  | {
-      type: "audio_error";
-      message: string;
-    }
-  | {
-      type: "error";
-      message: string;
-    };
-
 export type AgUiRunAgentInput = RunAgentInput;
 
 export type AgUiEvent = AGUIEvent;
@@ -706,17 +632,6 @@ export const appApi = {
   async health() {
     const response = await httpClient.getJson<{ status: string }>("/health");
     return response.status;
-  },
-
-  async ask(input: AskConsultationInput) {
-    return httpClient.postJson<AskConsultationResponse>("/consultation/ask", input);
-  },
-
-  async askStream(
-    input: AskConsultationInput,
-    onEvent: (event: AskConsultationStreamEvent) => void | Promise<void>,
-  ) {
-    return httpClient.postJsonStream<AskConsultationStreamEvent>("/consultation/ask/stream", input, onEvent);
   },
 
   async askAgUiStream(

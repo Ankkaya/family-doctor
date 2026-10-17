@@ -11,12 +11,10 @@ import {
   AgentSessionSummary,
   AgentTraceStep,
   AgentUserProfile,
-  AgentRecommend,
 } from '../agent-client/agent-client.types';
 import { CabinetService } from '../cabinet/cabinet.service';
 import { CurrentHousehold, HouseholdsService } from '@/domains/households/households.service';
 import { ConsultationAudioStreamerService } from './consultation-audio-streamer.service';
-import { AskConsultationDto } from './dto/ask-consultation.dto';
 import { QueryConsultationDto } from './dto/query-consultation.dto';
 import { RunConsultationDebugDto } from './dto/run-consultation-debug.dto';
 import {
@@ -97,25 +95,22 @@ type ConsultationTurn = {
 
 type CountRow = { count: bigint | number | string };
 
-type ConsultationStreamStage = 'prepare' | 'lookup' | 'agent' | 'fallback' | 'finalize';
+type ConsultationInput = {
+  sessionId?: string;
+  question: string;
+  allowRxRecommendation?: boolean;
+  audio?: { enabled?: boolean; codec?: 'mp3' | 'wav' };
+};
+
 type ConsultationSessionStatus = 'active' | 'resolved' | 'stale' | 'closed';
 
 type SessionMemoryContext = {
   historyMessages: AgentHistoryMessage[];
   sessionSummary: AgentSessionSummary | null;
   status: ConsultationSessionStatus;
-  allMessages: MessageRow[];
 };
 
-type SessionDecision = {
-  sessionId: string;
-  previousSessionId?: string;
-  status: ConsultationSessionStatus;
-};
-
-const FULL_HISTORY_MESSAGE_LIMIT = 10;
-const RECENT_HISTORY_MESSAGE_LIMIT = 6;
-const STALE_SESSION_MS = 2 * 60 * 60 * 1000;
+const RECENT_HISTORY_MESSAGE_LIMIT = 10;
 
 const EMPTY_PROFILE_VALUES = new Set([
   '无',
@@ -134,6 +129,7 @@ const EMPTY_PROFILE_VALUES = new Set([
 ]);
 
 const CONSULTATION_DEBUG_NODE_NAMES = [
+  'intent_router',
   'preprocess',
   'parse',
   'emergency',
@@ -141,60 +137,10 @@ const CONSULTATION_DEBUG_NODE_NAMES = [
   'match',
   'review',
   'safety',
-  'render',
   'summarize',
+  'render',
 ];
 
-export type ConsultationStreamEvent =
-  | {
-      type: 'session';
-      sessionId: string;
-      messageId: string;
-    }
-  | {
-      type: 'status';
-      stage: ConsultationStreamStage;
-      message: string;
-    }
-  | {
-      type: 'answer_delta';
-      delta: string;
-    }
-  | {
-      type: 'complete';
-      sessionId: string;
-      messageId: string;
-      answer: string;
-      recommends: AgentRecommend[];
-      disclaimer: string;
-    }
-  | {
-      type: 'audio_meta';
-      codec: 'mp3' | 'wav';
-      sampleRate: number;
-    }
-  | {
-      type: 'audio_chunk';
-      seq: number;
-      text: string;
-      audioBase64: string;
-      codec: 'mp3' | 'wav';
-    }
-  | {
-      type: 'audio_done';
-    }
-  | {
-      type: 'audio_error';
-      message: string;
-  };
-
-function normalizeStreamStage(stage?: string): ConsultationStreamStage {
-  if (stage === 'prepare' || stage === 'lookup' || stage === 'agent' || stage === 'fallback' || stage === 'finalize') {
-    return stage;
-  }
-
-  return 'agent';
-}
 @Injectable()
 export class ConsultationService {
   constructor(
@@ -205,172 +151,15 @@ export class ConsultationService {
     private readonly audioStreamerService: ConsultationAudioStreamerService,
   ) {}
 
-  async ask(dto: AskConsultationDto, current: CurrentHousehold) {
-    const question = dto.question.trim();
-    const decision = await this.resolveSessionForQuestion(dto.sessionId?.trim(), question, current);
-    const sessionId = decision.sessionId;
-    const assistantMessageId = randomUUID();
-    const title = this.buildSessionTitle(question);
-
-    await this.ensureSession(sessionId, title, current);
-    await this.createMessage({
-      id: randomUUID(),
-      sessionId,
-      role: 'USER',
-      content: question,
-      recommends: null,
-    });
-
-    const memory = await this.buildAgentMemoryContext(sessionId);
-    const medicineLookupQuery = this.buildMedicineLookupQuery(question, memory.sessionSummary);
-    const [medicines, userProfile, members, history] = await Promise.all([
-      this.cabinetService.findAgentBriefsByHousehold(current.householdId, medicineLookupQuery),
-      this.findAgentUserProfile(current.appUserId),
-      this.findAgentMembers(current.householdId),
-      this.findRecentMessagesForAgent(sessionId),
-    ]);
-    const agentResponse = await this.agentClient.consult({
-      sessionId,
-      question,
-      userId: current.appUserId,
-      householdId: current.householdId,
-      medicines,
-      members,
-      history,
-      userProfile,
-      historyMessages: memory.historyMessages,
-      sessionSummary: memory.sessionSummary,
-      conversationStatus: memory.status,
-      allowRxRecommendation: dto.allowRxRecommendation === true,
-      timezone: 'Asia/Shanghai',
-      now: new Date().toISOString(),
-    });
-
-    await this.createMessage({
-      id: assistantMessageId,
-      sessionId,
-      role: 'ASSISTANT',
-      content: agentResponse.answer,
-      recommends: agentResponse.recommends,
-    });
-    await this.updateSessionMemory(sessionId, agentResponse.sessionSummary, this.deriveNextStatus(agentResponse.sessionSummary, memory.status));
-    await this.createTraces(sessionId, agentResponse.traces ?? []);
-
-    return {
-      sessionId,
-      messageId: assistantMessageId,
-      answer: agentResponse.answer,
-      recommends: agentResponse.recommends,
-      disclaimer: agentResponse.disclaimer,
-    };
-  }
-
-  async askStream(
-    dto: AskConsultationDto,
-    current: CurrentHousehold,
-    onEvent: (event: ConsultationStreamEvent) => Promise<void> | void,
-  ) {
-    const question = dto.question.trim();
-    const decision = await this.resolveSessionForQuestion(dto.sessionId?.trim(), question, current);
-    const sessionId = decision.sessionId;
-    const assistantMessageId = randomUUID();
-    const title = this.buildSessionTitle(question);
-    const audioStreamer = dto.audio?.enabled === true
-      ? this.audioStreamerService.createStandard(dto.audio?.codec || 'mp3', onEvent)
-      : null;
-
-    if (dto.sessionId?.trim()) {
-      await this.assertSessionAccess(sessionId, current);
-    }
-
-    await this.ensureSession(sessionId, title, current);
-    await this.createMessage({
-      id: randomUUID(),
-      sessionId,
-      role: 'USER',
-      content: question,
-      recommends: null,
-    });
-    await onEvent({ type: 'session', sessionId, messageId: assistantMessageId });
-    await onEvent({ type: 'status', stage: 'lookup', message: '正在整理家庭药箱信息' });
-
-    const memory = await this.buildAgentMemoryContext(sessionId);
-    const medicineLookupQuery = this.buildMedicineLookupQuery(question, memory.sessionSummary);
-    const [medicines, userProfile, members, history] = await Promise.all([
-      this.cabinetService.findAgentBriefsByHousehold(current.householdId, medicineLookupQuery),
-      this.findAgentUserProfile(current.appUserId),
-      this.findAgentMembers(current.householdId),
-      this.findRecentMessagesForAgent(sessionId),
-    ]);
-
-    await onEvent({ type: 'status', stage: 'agent', message: '正在生成用药建议' });
-    const agentResponse = await this.agentClient.consultStream(
-      {
-        sessionId,
-        question,
-        userId: current.appUserId,
-        householdId: current.householdId,
-        medicines,
-        members,
-        history,
-        userProfile,
-        historyMessages: memory.historyMessages,
-        sessionSummary: memory.sessionSummary,
-        conversationStatus: memory.status,
-        allowRxRecommendation: dto.allowRxRecommendation === true,
-        timezone: 'Asia/Shanghai',
-        now: new Date().toISOString(),
-      },
-      async (event) => {
-        if (event.type === 'status') {
-          await onEvent({
-            type: 'status',
-            stage: normalizeStreamStage(event.stage),
-            message: event.message,
-          });
-          return;
-        }
-
-        if (event.type === 'answer_delta') {
-          await onEvent({ type: 'answer_delta', delta: event.delta });
-          audioStreamer?.push(event.delta);
-        }
-      },
-    );
-
-    await onEvent({ type: 'status', stage: 'finalize', message: '正在保存问诊记录' });
-    await this.createMessage({
-      id: assistantMessageId,
-      sessionId,
-      role: 'ASSISTANT',
-      content: agentResponse.answer,
-      recommends: agentResponse.recommends,
-    });
-    await this.updateSessionMemory(sessionId, agentResponse.sessionSummary, this.deriveNextStatus(agentResponse.sessionSummary, memory.status));
-    await this.createTraces(sessionId, agentResponse.traces ?? []);
-
-    await onEvent({
-      type: 'complete',
-      sessionId,
-      messageId: assistantMessageId,
-      answer: agentResponse.answer,
-      recommends: agentResponse.recommends,
-      disclaimer: agentResponse.disclaimer,
-    });
-
-    if (audioStreamer) {
-      await audioStreamer.finish();
-    }
-  }
-
   async askAgUiStream(
     input: AgentAgUiRunInput,
     current: CurrentHousehold,
     onEvent: (event: AgentAgUiEvent) => Promise<void> | void,
   ) {
     const runId: string = input.runId?.trim() || randomUUID();
-    const dto = this.toAskConsultationDto(input);
+    const dto = this.toConsultationInput(input);
     const question = dto.question.trim();
+    const questionReceivedAt = new Date();
     const sessionId = dto.sessionId?.trim() || input.threadId?.trim() || randomUUID();
     const assistantMessageId = randomUUID();
     const title = this.buildSessionTitle(question);
@@ -378,27 +167,18 @@ export class ConsultationService {
       ? this.audioStreamerService.createAgUi(dto.audio?.codec || 'mp3', onEvent)
       : null;
 
-    if (dto.sessionId?.trim()) {
-      await this.assertSessionAccess(sessionId, current);
-    }
+    await this.assertSessionAccess(sessionId, current);
 
     try {
       await this.ensureSession(sessionId, title, current);
-      await this.createMessage({
-        id: randomUUID(),
-        sessionId,
-        role: 'USER',
-        content: question,
-        recommends: null,
-      });
-
-      const [medicines, userProfile, members, history] = await Promise.all([
-        this.cabinetService.findAgentBriefsByHousehold(current.householdId, question),
+      const memory = await this.buildAgentMemoryContext(sessionId);
+      const [medicines, userProfile, members] = await Promise.all([
+        this.cabinetService.findAgentBriefsByHousehold(current.householdId, this.buildMedicineLookupQuery(question, memory.sessionSummary)),
         this.findAgentUserProfile(current.appUserId),
         this.findAgentMembers(current.householdId),
-        this.findRecentMessagesForAgent(sessionId),
       ]);
 
+      let finishedEvent: AgentAgUiEvent | undefined;
       const agentResponse = await this.agentClient.agUiStream(
         {
           ...input,
@@ -422,14 +202,22 @@ export class ConsultationService {
             householdId: current.householdId,
             medicines,
             members,
-            history,
+            history: memory.historyMessages.map(({ role, content }) => ({ role, content })),
             userProfile,
+            historyMessages: memory.historyMessages,
+            sessionSummary: memory.sessionSummary,
+            conversationStatus: memory.status,
             allowRxRecommendation: dto.allowRxRecommendation === true,
             timezone: 'Asia/Shanghai',
             now: new Date().toISOString(),
           },
         },
         async (event) => {
+          if (event.type === EventType.RUN_FINISHED) {
+            finishedEvent = event;
+            return;
+          }
+          if (event.type === EventType.RUN_ERROR) throw new Error(event.message);
           await onEvent(event);
           if (event.type === 'TEXT_MESSAGE_CONTENT') {
             audioStreamer?.push(event.delta);
@@ -437,23 +225,31 @@ export class ConsultationService {
         },
       );
 
-      await this.createMessage({
-        id: assistantMessageId,
-        sessionId,
-        role: 'ASSISTANT',
-        content: agentResponse.answer,
-        recommends: agentResponse.recommends,
+      if (!finishedEvent) throw new Error('Agent 未返回完成事件');
+      await this.prisma.$transaction(async tx => {
+        await this.createMessage({
+          id: randomUUID(), sessionId, role: 'USER', content: question, recommends: null,
+          createdAt: questionReceivedAt,
+        }, tx);
+        await this.createMessage({
+          id: assistantMessageId, sessionId, role: 'ASSISTANT',
+          content: agentResponse.answer, recommends: agentResponse.recommends,
+          createdAt: new Date(Math.max(Date.now(), questionReceivedAt.getTime() + 1)),
+        }, tx);
+        await this.updateSessionMemory(sessionId, agentResponse.sessionSummary, this.deriveNextStatus(agentResponse.sessionSummary, memory.status), tx);
+        await this.createTraces(sessionId, agentResponse.traces ?? [], tx);
       });
-      await this.createTraces(sessionId, agentResponse.traces ?? []);
-
       if (audioStreamer) {
         await audioStreamer.finish();
       }
+      await onEvent(finishedEvent);
     } catch (error) {
       await onEvent({
         type: EventType.RUN_ERROR,
         message: error instanceof Error ? error.message : '问诊服务暂不可用',
         code: 'CONSULTATION_ERROR',
+        runId,
+        threadId: sessionId,
       });
       if (audioStreamer) {
         try {
@@ -500,16 +296,25 @@ export class ConsultationService {
         : Promise.resolve(null),
     ]);
 
-    const agentResponse = await this.agentClient.consult({
-      sessionId: debugRunId,
-      question,
-      medicines,
-      userProfile,
-      historyMessages: this.normalizeDebugHistoryMessages(dto.historyMessages),
-      sessionSummary,
-      conversationStatus: this.normalizeSessionStatus(dto.conversationStatus),
-      allowRxRecommendation: dto.allowRxRecommendation === true,
-    });
+    const agentResponse = await this.agentClient.agUiStream({
+      threadId: debugRunId,
+      runId: debugRunId,
+      state: {},
+      messages: [{ id: randomUUID(), role: "user", content: question }],
+      tools: [],
+      context: [],
+      forwardedProps: {
+        sessionId: debugRunId,
+        question,
+        medicines,
+        userProfile,
+        historyMessages: this.normalizeDebugHistoryMessages(dto.historyMessages),
+        history: this.normalizeDebugHistoryMessages(dto.historyMessages).map(({ role, content }) => ({ role, content })),
+        sessionSummary,
+        conversationStatus: this.normalizeSessionStatus(dto.conversationStatus),
+        allowRxRecommendation: dto.allowRxRecommendation === true,
+      },
+    }, () => {});
 
     const traces = (agentResponse.traces ?? []).map((trace, index) => this.buildTraceDetail({
       id: randomUUID(),
@@ -757,58 +562,21 @@ export class ConsultationService {
     role: 'USER' | 'ASSISTANT';
     content: string;
     recommends: unknown | null;
-  }) {
+    createdAt: Date;
+  }, db: Prisma.TransactionClient = this.prisma) {
     const recommendsJson = input.recommends ? JSON.stringify(input.recommends) : null;
 
-    await this.prisma.$executeRaw(Prisma.sql`
-      INSERT INTO consultation_message (id, session_id, role, content, recommends)
+    await db.$executeRaw(Prisma.sql`
+      INSERT INTO consultation_message (id, session_id, role, content, recommends, created_at)
       VALUES (
         ${input.id},
         ${input.sessionId},
         ${input.role}::"MsgRole",
         ${input.content},
-        ${recommendsJson}::jsonb
+        ${recommendsJson}::jsonb,
+        ${input.createdAt}
       )
     `);
-  }
-
-  private async resolveSessionForQuestion(
-    requestedSessionId: string | undefined,
-    question: string,
-    current: CurrentHousehold,
-  ): Promise<SessionDecision> {
-    if (!requestedSessionId) {
-      return { sessionId: randomUUID(), status: 'active' };
-    }
-
-    const session = await this.assertSessionAccess(requestedSessionId, current);
-    if (!session) {
-      return { sessionId: requestedSessionId, status: 'active' };
-    }
-
-    const memory = await this.buildAgentMemoryContext(requestedSessionId);
-    const status = this.normalizeSessionStatus(session.status ?? memory.status);
-    const followUp = this.isLikelyFollowUp(question);
-    const stale = this.isSessionStale(memory.allMessages);
-    const newTopic = this.isLikelyNewTopic(question, memory.sessionSummary);
-
-    if (status === 'closed' || (status === 'resolved' && !followUp) || (newTopic && !followUp) || (stale && !followUp)) {
-      if (stale) {
-        await this.updateSessionStatus(requestedSessionId, 'stale');
-      }
-      return {
-        sessionId: randomUUID(),
-        previousSessionId: requestedSessionId,
-        status: 'active',
-      };
-    }
-
-    if (stale && status === 'active') {
-      await this.updateSessionStatus(requestedSessionId, 'stale');
-      return { sessionId: requestedSessionId, status: 'stale' };
-    }
-
-    return { sessionId: requestedSessionId, status };
   }
 
   private async buildAgentMemoryContext(sessionId: string): Promise<SessionMemoryContext> {
@@ -839,16 +607,15 @@ export class ConsultationService {
           created_at as "createdAt"
         FROM consultation_message
         WHERE session_id = ${sessionId}
-        ORDER BY created_at ASC
+        ORDER BY created_at DESC, id DESC
+        LIMIT ${RECENT_HISTORY_MESSAGE_LIMIT}
       `),
     ]);
 
     const session = sessionRows[0];
     const status = this.normalizeSessionStatus(session?.status);
     const summary = this.normalizeSessionSummary(session?.summary);
-    const selectedMessages = messages.length <= FULL_HISTORY_MESSAGE_LIMIT
-      ? messages
-      : messages.slice(-RECENT_HISTORY_MESSAGE_LIMIT);
+    const selectedMessages = messages.reverse();
 
     return {
       historyMessages: selectedMessages.map((message) => ({
@@ -858,7 +625,6 @@ export class ConsultationService {
       })),
       sessionSummary: summary,
       status,
-      allMessages: messages,
     };
   }
 
@@ -866,10 +632,11 @@ export class ConsultationService {
     sessionId: string,
     summary: AgentSessionSummary | null | undefined,
     status: ConsultationSessionStatus,
+    db: Prisma.TransactionClient = this.prisma,
   ) {
     const summaryJson = summary ? JSON.stringify(this.normalizeSessionSummary(summary)) : null;
 
-    await this.prisma.$executeRaw(Prisma.sql`
+    const updated = await db.$executeRaw(Prisma.sql`
       UPDATE consultation_session
       SET
         summary = COALESCE(${summaryJson}::jsonb, summary),
@@ -878,20 +645,12 @@ export class ConsultationService {
       WHERE id = ${sessionId}
         AND deleted_at IS NULL
     `);
+    if (updated === 0) throw new NotFoundException('问诊会话不存在或已删除');
   }
 
-  private async updateSessionStatus(sessionId: string, status: ConsultationSessionStatus) {
-    await this.prisma.$executeRaw(Prisma.sql`
-      UPDATE consultation_session
-      SET status = ${status}
-      WHERE id = ${sessionId}
-        AND deleted_at IS NULL
-    `);
-  }
-
-  private async createTraces(sessionId: string, traces: AgentTraceStep[]) {
+  private async createTraces(sessionId: string, traces: AgentTraceStep[], db: Prisma.TransactionClient = this.prisma) {
     for (const trace of traces) {
-      await this.prisma.$executeRaw(Prisma.sql`
+      await db.$executeRaw(Prisma.sql`
         INSERT INTO agent_trace (
           id,
           session_id,
@@ -955,27 +714,6 @@ export class ConsultationService {
     }));
   }
 
-  private async findRecentMessagesForAgent(sessionId: string) {
-    const rows = await this.prisma.$queryRaw<MessageRow[]>(Prisma.sql`
-      SELECT
-        id,
-        session_id as "sessionId",
-        role::text as role,
-        content,
-        recommends,
-        created_at as "createdAt"
-      FROM consultation_message
-      WHERE session_id = ${sessionId}
-      ORDER BY created_at DESC
-      LIMIT 8
-    `);
-
-    return rows.reverse().map((message) => ({
-      role: message.role,
-      content: message.content,
-    }));
-  }
-
   private buildSessionWhere(input: { keyword?: string; householdId?: string; userId?: string }) {
     const conditions: Prisma.Sql[] = [
       Prisma.sql`s.deleted_at IS NULL`,
@@ -1006,7 +744,7 @@ export class ConsultationService {
     return title.length > 24 ? `${title.slice(0, 24)}...` : title;
   }
 
-  private toAskConsultationDto(input: AgentAgUiRunInput): AskConsultationDto {
+  private toConsultationInput(input: AgentAgUiRunInput): ConsultationInput {
     const question = this.extractLatestUserText(input.messages)
       || this.pickString(input.forwardedProps?.question)
       || this.pickString(input.state?.question);
@@ -1072,7 +810,7 @@ export class ConsultationService {
     return typeof value === 'boolean' ? value : undefined;
   }
 
-  private pickAudioConfig(value: unknown): AskConsultationDto['audio'] | undefined {
+  private pickAudioConfig(value: unknown): ConsultationInput['audio'] | undefined {
     if (!value || typeof value !== 'object') {
       return undefined;
     }
@@ -1172,65 +910,6 @@ export class ConsultationService {
       ...(summary?.mentionedMedicines ?? []),
     ];
     return parts.filter((item): item is string => Boolean(item?.trim())).join(' ').slice(0, 240);
-  }
-
-  private isSessionStale(messages: MessageRow[]) {
-    const latest = messages[messages.length - 1];
-    if (!latest) {
-      return false;
-    }
-
-    return Date.now() - this.toTimestamp(latest.createdAt) > STALE_SESSION_MS;
-  }
-
-  private isLikelyFollowUp(question: string) {
-    const compact = question.replace(/\s+/g, '');
-    return /这个|那个|这药|该药|刚才|上面|前面|继续|还能|还可以|能不能|怎么吃|饭前|饭后|多久|剂量|用量|它|副作用|禁忌|可以吃吗/.test(compact);
-  }
-
-  private isLikelyNewTopic(question: string, summary: AgentSessionSummary | null) {
-    const compact = question.replace(/\s+/g, '');
-    if (/另外|换个问题|另一个问题|我妈|我爸|孩子|小孩|老人|家人/.test(compact)) {
-      return true;
-    }
-
-    const previousSymptoms = new Set(summary?.symptoms ?? []);
-    if (previousSymptoms.size === 0) {
-      return false;
-    }
-
-    const currentSymptoms = this.extractSymptomHints(compact);
-    if (currentSymptoms.length === 0) {
-      return false;
-    }
-
-    return currentSymptoms.every((symptom) => !previousSymptoms.has(symptom));
-  }
-
-  private extractSymptomHints(text: string) {
-    const knownSymptoms = [
-      '头痛',
-      '头疼',
-      '发热',
-      '发烧',
-      '咳嗽',
-      '咽痛',
-      '嗓子疼',
-      '腹泻',
-      '拉肚子',
-      '恶心',
-      '呕吐',
-      '流涕',
-      '鼻塞',
-      '胃痛',
-      '胃疼',
-      '牙痛',
-      '口腔溃疡',
-      '皮疹',
-      '胸痛',
-    ];
-
-    return knownSymptoms.filter((symptom) => text.includes(symptom));
   }
 
   private pickStringList(value: unknown) {

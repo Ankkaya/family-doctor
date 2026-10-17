@@ -6,6 +6,7 @@ from typing import Protocol, TypeVar
 from pydantic import BaseModel
 
 from ..config import Settings
+from .messages import HistoryChatMessage
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -13,11 +14,11 @@ T = TypeVar("T", bound=BaseModel)
 class LLMProvider(Protocol):
     model: str
 
-    async def chat(self, *, system: str, user: str) -> str: ...
+    async def chat(self, *, system: str, user: str, history: list[HistoryChatMessage] | None = None) -> str: ...
 
-    async def chat_stream(self, *, system: str, user: str) -> AsyncIterator[str]: ...
+    async def chat_stream(self, *, system: str, user: str, history: list[HistoryChatMessage] | None = None) -> AsyncIterator[str]: ...
 
-    async def structured(self, *, system: str, user: str, schema: type[T]) -> T: ...
+    async def structured(self, *, system: str, user: str, schema: type[T], history: list[HistoryChatMessage] | None = None) -> T: ...
 
     async def structured_with_images(
         self,

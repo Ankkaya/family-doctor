@@ -7,6 +7,7 @@ from typing import TypeVar
 
 from openai import AsyncOpenAI
 from pydantic import BaseModel
+from .messages import HistoryChatMessage, text_messages
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -18,24 +19,18 @@ class OpenAICompatProvider:
         self._client = AsyncOpenAI(api_key=api_key, base_url=base_url)
         self.model = model
 
-    async def chat(self, *, system: str, user: str) -> str:
+    async def chat(self, *, system: str, user: str, history: list[HistoryChatMessage] | None = None) -> str:
         resp = await self._client.chat.completions.create(
             model=self.model,
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
+            messages=text_messages(system=system, user=user, history=history),
             temperature=0.3,
         )
         return (resp.choices[0].message.content or "").strip()
 
-    async def chat_stream(self, *, system: str, user: str) -> AsyncIterator[str]:
+    async def chat_stream(self, *, system: str, user: str, history: list[HistoryChatMessage] | None = None) -> AsyncIterator[str]:
         stream = await self._client.chat.completions.create(
             model=self.model,
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
+            messages=text_messages(system=system, user=user, history=history),
             temperature=0.3,
             stream=True,
         )
@@ -44,7 +39,7 @@ class OpenAICompatProvider:
             if delta:
                 yield delta
 
-    async def structured(self, *, system: str, user: str, schema: type[T]) -> T:
+    async def structured(self, *, system: str, user: str, schema: type[T], history: list[HistoryChatMessage] | None = None) -> T:
         """以 JSON mode 拿结构化输出。生产环境可改为 function calling 或 Responses API。"""
         sys_with_schema = (
             f"{system}\n\n"
@@ -53,10 +48,7 @@ class OpenAICompatProvider:
         )
         resp = await self._client.chat.completions.create(
             model=self.model,
-            messages=[
-                {"role": "system", "content": sys_with_schema},
-                {"role": "user", "content": user},
-            ],
+            messages=text_messages(system=sys_with_schema, user=user, history=history),
             temperature=0.1,
             response_format={"type": "json_object"},
         )

@@ -13,7 +13,7 @@ from ...tools.safety_tools import (
     normalize_profile_text,
 )
 from ...tracing import trace_node
-from ..context import dump_conversation_context
+from ..context import dump_conversation_context, history_chat_messages
 
 REVIEW_PROMPT_KEY = "consult.review.system"
 REVIEW_PROMPT_VERSION = "v1"
@@ -27,6 +27,7 @@ def make_review_node(llm: LLMProvider):
         candidates: list[MedicineBrief] = state.get("candidates") or []
         flags: list[str] = state.get("special_population_flags") or []
         allow_rx_recommendation = bool(state.get("allow_rx_recommendation"))
+        history = history_chat_messages(state)
         prompt_payload = build_review_prompt(
             question=state.get("normalized_question") or state.get("question") or "",
             parsed=parsed,
@@ -56,6 +57,7 @@ def make_review_node(llm: LLMProvider):
                 "promptVersion": REVIEW_PROMPT_VERSION,
                 "systemPrompt": REVIEW_SYSTEM,
                 "userPrompt": prompt_payload,
+                "historyMessages": history,
             },
         ) as rec:
             if not candidates:
@@ -72,6 +74,7 @@ def make_review_node(llm: LLMProvider):
                     system=REVIEW_SYSTEM,
                     user=prompt_payload,
                     schema=RiskReviewOutput,
+                    history=history,
                 )
                 risked, decisions = apply_review(
                     candidates=candidates,

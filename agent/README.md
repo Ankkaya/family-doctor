@@ -2,7 +2,11 @@
 
 家庭药箱问药 Agent 服务。FastAPI + LangGraph。被 NestJS 内部调用，不直接暴露给客户端。
 
+唯一问诊执行接口 `/agent/ag-ui`（AG-UI / SSE）不再规划、确认或创建定时任务。提醒类意图仅返回个人中心定时任务入口引导，历史提醒方案的确认也不会触发创建。已有定时任务的管理接口、独立调度服务及 `/agent/jobs/*` 执行接口保持独立运行。
+
 ## 目录
+
+问诊模型输入统一为 `system → 历史 user/assistant → 本轮 user`。历史来自后端此前已保存的会话记录，窗口最多 10 条，本轮问题单独传入；不按文字匹配删除历史。历史不再嵌入节点的用户提示词 JSON；摘要及会话状态继续作为结构化背景提供。模型完成后，后端在同一事务中保存本轮用户问题、助手回答、会话摘要与执行记录。
 
 ```
 app/
@@ -11,12 +15,12 @@ app/
   schemas.py         与 NestJS 对齐的 DTO
   tracing.py         节点 IO 追踪工具
   api/
-    consult.py       POST /agent/consult
+    consult.py       POST /agent/ag-ui
     health.py        GET /agent/health
     medicine.py      POST /agent/medicine/recognize-images
   graph/
     state.py         LangGraph State
-    builder.py       构图: parse -> match -> risk -> render
+    builder.py       构图: preprocess -> parse -> emergency -> special_population -> match -> review -> safety -> summarize；图外流式 render
     nodes/
       parse.py       症状结构化
       match.py       药品召回 (纯 Python 关键词匹配, v1)

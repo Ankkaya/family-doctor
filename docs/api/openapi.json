@@ -3192,66 +3192,6 @@
         ]
       }
     },
-    "/consultation/ask": {
-      "post": {
-        "operationId": "ConsultationController_ask",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AskConsultationDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "App 发起一次问诊",
-        "tags": [
-          "家庭医生/问诊"
-        ]
-      }
-    },
-    "/consultation/ask/stream": {
-      "post": {
-        "operationId": "ConsultationController_askStream",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AskConsultationDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "App 流式发起一次问诊",
-        "tags": [
-          "家庭医生/问诊"
-        ]
-      }
-    },
     "/consultation/ag-ui": {
       "post": {
         "operationId": "ConsultationController_askAgUi",
@@ -5017,51 +4957,6 @@
             "description": "备注"
           }
         }
-      },
-      "AskConsultationAudioDto": {
-        "type": "object",
-        "properties": {
-          "enabled": {
-            "type": "boolean",
-            "description": "是否返回语音播报事件"
-          },
-          "codec": {
-            "type": "string",
-            "description": "音频编码",
-            "enum": [
-              "mp3",
-              "wav"
-            ]
-          }
-        }
-      },
-      "AskConsultationDto": {
-        "type": "object",
-        "properties": {
-          "sessionId": {
-            "type": "string",
-            "description": "已有会话 ID；为空时后端创建新会话"
-          },
-          "question": {
-            "type": "string",
-            "description": "用户症状描述"
-          },
-          "allowRxRecommendation": {
-            "type": "boolean",
-            "description": "是否允许 Agent 推荐 RX 处方药，默认 false"
-          },
-          "audio": {
-            "description": "语音播报配置",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/AskConsultationAudioDto"
-              }
-            ]
-          }
-        },
-        "required": [
-          "question"
-        ]
       },
       "AgUiRunAgentDto": {
         "type": "object",

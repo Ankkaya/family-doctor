@@ -30,6 +30,14 @@ export type ConsultationPromptCatalogItem = PromptDefinition & {
 };
 
 const NODE_SPECS: Record<string, ConsultationNodeSpec> = {
+  intent_router: {
+    nodeName: 'intent_router',
+    title: '意图路由',
+    description: '结合当前问题、历史和摘要，选择问药流程或返回业务入口引导。',
+    capabilities: ['意图分类', '上下文理解', '入口引导'],
+    expectedInput: ['question', 'history', 'sessionSummary'],
+    expectedOutput: ['intent', 'confidence', 'needsClarification'],
+  },
   preprocess: {
     nodeName: 'preprocess',
     title: '输入预处理',
@@ -112,9 +120,9 @@ const NODE_SPECS: Record<string, ConsultationNodeSpec> = {
   summarize: {
     nodeName: 'summarize',
     title: '会话摘要更新',
-    description: '把本轮问诊结果合并进结构化会话摘要，供长对话后续轮次压缩上下文使用。',
+    description: '在流式回复前合并旧摘要、症状、药品审查及安全审核后的推荐结果，随完成事件返回后端保存，供后续轮次使用。',
     capabilities: ['摘要合并', '推荐/拒绝药品留痕', '临时风险事实提取', '会话状态建议'],
-    expectedInput: ['existingSummary: 旧摘要', 'parsedSymptoms', 'reviewDecisions', 'recommends', 'riskFlags'],
+    expectedInput: ['existingSummary: 旧摘要', 'parsedSymptoms', 'reviewDecisions', 'risked: 安全审查后的推荐', 'riskFlags'],
     expectedOutput: ['sessionSummary: 更新后的结构化摘要', 'suggestedStatus'],
     promptExpectation: '无 LLM Prompt，基于本轮结构化结果做规则合并。',
   },

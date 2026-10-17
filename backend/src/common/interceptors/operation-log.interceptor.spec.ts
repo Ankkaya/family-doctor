@@ -70,7 +70,7 @@ describe('OperationLogInterceptor', () => {
     const interceptor = new OperationLogInterceptor(prisma);
     const request = {
       method: 'POST',
-      originalUrl: '/consultation/ask',
+      originalUrl: '/consultation/ag-ui',
       params: {},
       body: { question: '哈哈' },
       user: { userId: 'cmpge4nac0000pkuje9cf8wex', appUserId: 'cmpge4nac0000pkuje9cf8wex', username: 'admin1' },
@@ -93,7 +93,7 @@ describe('OperationLogInterceptor', () => {
         username: 'admin1',
         module: 'consultation',
         method: 'POST',
-        path: '/consultation/ask',
+        path: '/consultation/ag-ui',
       }),
     });
   });

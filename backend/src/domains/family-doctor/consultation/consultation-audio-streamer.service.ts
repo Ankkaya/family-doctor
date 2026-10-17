@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { EventType } from '@ag-ui/core';
 import { TencentTtsService } from '../voice/tencent-tts.service';
 import type { AgentAgUiEvent } from '../agent-client/agent-client.types';
-import type { ConsultationStreamEvent } from './consultation.service';
 
 type AudioCodec = 'mp3' | 'wav';
 type AudioStreamer = {
@@ -13,18 +12,6 @@ type AudioStreamer = {
 @Injectable()
 export class ConsultationAudioStreamerService {
   constructor(private readonly ttsService: TencentTtsService) {}
-
-  createStandard(
-    codec: AudioCodec,
-    onEvent: (event: ConsultationStreamEvent) => Promise<void> | void,
-  ): AudioStreamer {
-    return this.create(codec, {
-      metadata: (audio) => onEvent({ type: 'audio_meta', ...audio }),
-      chunk: (chunk) => onEvent({ type: 'audio_chunk', ...chunk }),
-      done: () => onEvent({ type: 'audio_done' }),
-      error: (message) => onEvent({ type: 'audio_error', message }),
-    });
-  }
 
   createAgUi(
     codec: AudioCodec,

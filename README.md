@@ -35,7 +35,7 @@ App 主链路：
 ```text
 app/src/stores/useAppStore.ts
   -> app/src/shared/api/app-api.ts
-  -> POST /consultation/ask
+  -> POST /consultation/ag-ui (AG-UI / SSE)
   -> backend/src/domains/family-doctor/consultation
   -> backend/src/domains/family-doctor/agent-client
   -> agent/app/api/consult.py
@@ -111,7 +111,7 @@ Agent 默认使用真实 OpenAI 兼容模型配置。需要离线联调时可显
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| `POST` | `/consultation/ask` | App 发起问诊，后端转发 Agent 并保存消息/trace |
+| `POST` | `/consultation/ag-ui` | App 通过 AG-UI 发起问诊，后端传入上下文，保存消息、摘要与 trace 后确认完成 |
 | `GET` | `/medicine/cabinet` | App 查询当前家庭自维护药箱 |
 | `POST` | `/medicine/cabinet` | App 新增当前家庭药品 |
 | `PATCH` | `/medicine/cabinet/:inventoryId` | App 更新当前家庭药品 |

@@ -10,6 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
+from tests.agui import post_consult
 from app.config import get_settings
 from app import main as main_module
 from app.schemas import (
@@ -63,17 +64,19 @@ class FakeProvider:
     def __init__(self, model: str = "test-model") -> None:
         self.model = model
 
-    async def chat(self, *, system: str, user: str) -> str:  # noqa: ARG002
+    async def chat(self, *, system: str, user: str, history=None) -> str:  # noqa: ARG002
         return "测试模型回复：请结合症状休息观察，必要时就医。"
 
-    async def chat_stream(self, *, system: str, user: str) -> AsyncIterator[str]:  # noqa: ARG002
-        answer = await self.chat(system=system, user=user)
+    async def chat_stream(self, *, system: str, user: str, history=None) -> AsyncIterator[str]:  # noqa: ARG002
+        answer = await self.chat(system=system, user=user, history=history)
         for index in range(0, len(answer), 8):
             yield answer[index:index + 8]
 
-    async def structured(self, *, system: str, user: str, schema: type[T]) -> T:  # noqa: ARG002
+    async def structured(self, *, system: str, user: str, schema: type[T], history=None) -> T:  # noqa: ARG002
+        history_text = "\n".join(message["content"] for message in history or [])
+        routing_text = user + history_text
         if schema is IntentDecision:
-            if any(keyword in user for keyword in ("提醒", "定时", "每隔", "每周", "闹钟")):
+            if any(keyword in routing_text for keyword in ("提醒", "定时", "每隔", "每周", "闹钟")):
                 task_type = "medicine"
                 if any(keyword in user for keyword in ("体温", "量温", "测温", "发烧")):
                     task_type = "temperature"
@@ -111,10 +114,10 @@ class FakeProvider:
                 }
             )
         if schema is ParsedSymptoms:
-            emergency = any(keyword in user for keyword in EMERGENCY_KEYWORDS)
+            emergency = any(keyword in routing_text for keyword in EMERGENCY_KEYWORDS)
             return schema.model_validate(
                 {
-                    "symptoms": _keyword_symptoms(user) or ["不适"],
+                    "symptoms": _keyword_symptoms(routing_text) or ["不适"],
                     "severity": "mild",
                     "duration": None,
                     "populationHints": [],
@@ -214,8 +217,7 @@ def test_health(client: TestClient) -> None:
 
 
 def test_agent_api_rejects_missing_internal_token(client: TestClient) -> None:
-    r = client.post(
-        "/agent/consult",
+    r = post_consult(client,
         headers={"x-agent-token": ""},
         json={"sessionId": "s-auth", "question": "头痛怎么办", "medicines": []},
     )
@@ -224,8 +226,7 @@ def test_agent_api_rejects_missing_internal_token(client: TestClient) -> None:
 
 
 def test_consult_basic(client: TestClient) -> None:
-    r = client.post(
-        "/agent/consult",
+    r = post_consult(client,
         json={
             "sessionId": "s1",
             "question": "这两天头痛发热，家里能吃什么药",
@@ -246,8 +247,7 @@ def test_consult_basic(client: TestClient) -> None:
 
 
 def test_consult_uses_history_for_follow_up_question(client: TestClient) -> None:
-    r = client.post(
-        "/agent/consult",
+    r = post_consult(client,
         json={
             "sessionId": "s-follow-up",
             "question": "那这个药饭后吃可以吗",
@@ -286,8 +286,7 @@ def test_consult_uses_history_for_follow_up_question(client: TestClient) -> None
 
 
 def test_consult_hard_blocks_allergy_contraindication(client: TestClient) -> None:
-    r = client.post(
-        "/agent/consult",
+    r = post_consult(client,
         json={
             "sessionId": "s-allergy",
             "question": "细菌感染能吃什么",
@@ -308,8 +307,7 @@ def test_consult_never_recommends_rx_for_self_medication(client: TestClient) -> 
         **SAMPLE_MEDICINES[2],
         "indication": "头痛、发热",
     }
-    r = client.post(
-        "/agent/consult",
+    r = post_consult(client,
         json={
             "sessionId": "s-rx",
             "question": "头痛发热吃什么",
@@ -325,8 +323,7 @@ def test_consult_never_recommends_rx_for_self_medication(client: TestClient) -> 
 
 
 def test_consult_hard_blocks_child_self_medication(client: TestClient) -> None:
-    r = client.post(
-        "/agent/consult",
+    r = post_consult(client,
         json={
             "sessionId": "s-child",
             "question": "孩子头痛发热吃什么",
@@ -342,8 +339,7 @@ def test_consult_hard_blocks_child_self_medication(client: TestClient) -> None:
 
 
 def test_consult_does_not_recommend_weak_vector_match_for_headache(client: TestClient) -> None:
-    r = client.post(
-        "/agent/consult",
+    r = post_consult(client,
         json={
             "sessionId": "s-headache",
             "question": "我头好疼",
@@ -382,8 +378,7 @@ def test_consult_does_not_recommend_weak_vector_match_for_headache(client: TestC
 
 
 def test_consult_matches_oral_ulcer_to_stomatitis_indication(client: TestClient) -> None:
-    r = client.post(
-        "/agent/consult",
+    r = post_consult(client,
         json={
             "sessionId": "s-oral-ulcer",
             "question": "我口腔溃疡了",
@@ -407,8 +402,7 @@ def test_consult_matches_oral_ulcer_to_stomatitis_indication(client: TestClient)
 
 
 def test_consult_reason_does_not_expose_vector_source(client: TestClient) -> None:
-    r = client.post(
-        "/agent/consult",
+    r = post_consult(client,
         json={
             "sessionId": "s-vector-reason",
             "question": "我头痛",
@@ -432,8 +426,7 @@ def test_consult_reason_does_not_expose_vector_source(client: TestClient) -> Non
 
 
 def test_consult_answer_explains_when_no_suitable_medicine(client: TestClient) -> None:
-    r = client.post(
-        "/agent/consult",
+    r = post_consult(client,
         json={
             "sessionId": "s-no-suitable",
             "question": "我头好疼",
@@ -457,8 +450,7 @@ def test_consult_answer_explains_when_no_suitable_medicine(client: TestClient) -
 
 
 def test_consult_ignores_negative_profile_markers(client: TestClient) -> None:
-    r = client.post(
-        "/agent/consult",
+    r = post_consult(client,
         json={
             "sessionId": "s-empty-profile-markers",
             "question": "你好",
@@ -484,8 +476,7 @@ def test_consult_ignores_negative_profile_markers(client: TestClient) -> None:
 
 
 def test_consult_emergency(client: TestClient) -> None:
-    r = client.post(
-        "/agent/consult",
+    r = post_consult(client,
         json={
             "sessionId": "s2",
             "question": "患者突然胸痛意识不清",
@@ -499,8 +490,7 @@ def test_consult_emergency(client: TestClient) -> None:
 
 
 def test_router_keeps_medicine_question_out_of_reminder_flow(client: TestClient) -> None:
-    r = client.post(
-        "/agent/consult",
+    r = post_consult(client,
         json={
             "sessionId": "s-router-medicine",
             "question": "布洛芬缓释胶囊怎么吃",
@@ -514,60 +504,26 @@ def test_router_keeps_medicine_question_out_of_reminder_flow(client: TestClient)
     assert "parse" in trace_names
 
 
-def test_router_sends_explicit_reminder_to_cron_planner(client: TestClient) -> None:
-    r = client.post(
-        "/agent/consult",
-        json={
-            "sessionId": "s-router-reminder",
-            "question": "明天早上提醒我吃布洛芬缓释胶囊",
-            "medicines": SAMPLE_MEDICINES,
-            "now": "2026-07-07T08:00:00+08:00",
-        },
-    )
-    assert r.status_code == 200
-    body = r.json()
-    trace_names = [trace["nodeName"] for trace in body["traces"]]
-    assert trace_names[:2] == ["intent_router", "cron_job_plan"]
+@pytest.mark.parametrize("confirm_previous", [False, True])
+def test_reminders_stay_out_of_consult_flow(client: TestClient, monkeypatch: pytest.MonkeyPatch, confirm_previous: bool) -> None:
+    from app.tools.cron_job_tool import CronJobTool
+
+    async def unexpected_create(*args, **kwargs):
+        pytest.fail("Consultation must not create scheduled jobs")
+
+    monkeypatch.setattr(CronJobTool, "create_job", unexpected_create)
+    response = post_consult(client, json={
+        "sessionId": "s-reminder", "householdId": "household-test",
+        "question": "确认" if confirm_previous else "明天早上提醒我吃布洛芬缓释胶囊",
+        "medicines": SAMPLE_MEDICINES,
+        "history": [{"role": "ASSISTANT", "content": "请确认：明天早上提醒我吃布洛芬。回复“确认”后创建提醒。"}] if confirm_previous else [],
+    })
+    assert response.status_code == 200
+    body = response.json()
+    assert [trace["nodeName"] for trace in body["traces"]] == ["intent_router"]
     assert body["recommends"] == []
-    assert "请确认" in body["answer"]
-
-
-def test_consult_stream_reports_node_progress(client: TestClient) -> None:
-    with client.stream(
-        "POST",
-        "/agent/consult/stream",
-        json={
-            "sessionId": "s-stream",
-            "question": "这两天头痛发热，家里能吃什么药",
-            "medicines": SAMPLE_MEDICINES,
-        },
-    ) as response:
-        assert response.status_code == 200
-        events = [json.loads(line) for line in response.iter_lines() if line]
-
-    status_messages = [
-        event["message"]
-        for event in events
-        if event["type"] == "status"
-    ]
-    assert "正在识别症状和持续时间" in status_messages
-    assert "正在匹配家庭药箱药品" in status_messages
-    assert "正在审查药品适配性" in status_messages
-    assert "正在组织回复" in status_messages
-
-    complete = events[-1]
-    assert complete["type"] == "complete"
-    assert complete["answer"]
-    answer_deltas = [
-        event["delta"]
-        for event in events
-        if event["type"] == "answer_delta"
-    ]
-    assert answer_deltas
-    assert "".join(answer_deltas) == complete["answer"]
-    assert complete["disclaimer"]
-    assert len(complete["traces"]) >= 4
-
+    assert "个人中心的定时任务" in body["answer"]
+    assert "请确认" not in body["answer"]
 
 def test_ag_ui_stream_reports_standard_events(client: TestClient) -> None:
     with client.stream(
@@ -614,6 +570,75 @@ def test_ag_ui_stream_reports_standard_events(client: TestClient) -> None:
     assert finished["result"]["answer"] == answer
     assert finished["result"]["messageId"] == "msg-assistant"
     assert finished["result"]["recommends"]
+    assert finished["result"]["sessionSummary"]["recommendedMedicines"]
+    statuses = [event["value"]["message"] for event in events if event["type"] == "CUSTOM" and event["name"] == "consultation.status"]
+    assert "正在识别症状和持续时间" in statuses
+    assert "正在审查药品适配性" in statuses
+
+
+def test_agui_passes_context_and_returns_updated_summary(client: TestClient) -> None:
+    history = [{"role": "USER", "content": f"历史 {index}", "createdAt": "2026-10-17T00:00:00Z"} for index in range(12)]
+    summary = {"symptoms": ["头痛"], "temporaryUserFacts": ["青霉素过敏"]}
+    response = post_consult(client, json={
+        "sessionId": "memory-test", "question": "这个药饭后吃吗", "medicines": SAMPLE_MEDICINES,
+        "historyMessages": history, "sessionSummary": summary, "conversationStatus": "resolved",
+    })
+    assert response.status_code == 200
+    body = response.json()
+    parse = next(trace for trace in body["traces"] if trace["nodeName"] == "parse")
+    context = json.loads(parse["input"]["userPrompt"])["conversationContext"]
+    assert "recentMessages" not in context
+    assert len(parse["input"]["historyMessages"]) == 10
+    assert parse["input"]["historyMessages"][0] == {"role": "user", "content": "历史 2"}
+    assert context["sessionSummary"]["symptoms"] == ["头痛"]
+    assert context["conversationStatus"] == "resolved"
+    assert "青霉素过敏" in body["sessionSummary"]["temporaryUserFacts"]
+
+
+@pytest.mark.parametrize("path", ["/agent/consult", "/agent/consult/stream"])
+def test_legacy_consult_routes_are_removed(client: TestClient, path: str) -> None:
+    assert client.post(path, json={}).status_code == 404
+
+
+def test_all_consult_model_calls_receive_role_history_without_current_turn(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = []
+    original_structured = FakeProvider.structured
+    original_stream = FakeProvider.chat_stream
+
+    async def structured(self, **kwargs):
+        calls.append((kwargs["schema"].__name__, kwargs))
+        return await original_structured(self, **kwargs)
+
+    async def chat_stream(self, **kwargs):
+        calls.append(("render", kwargs))
+        async for chunk in original_stream(self, **kwargs):
+            yield chunk
+
+    monkeypatch.setattr(FakeProvider, "structured", structured)
+    monkeypatch.setattr(FakeProvider, "chat_stream", chat_stream)
+    question = "这个药饭后吃吗"
+    history = [
+        {"role": "USER", "content": "我头痛两天"},
+        {"role": "ASSISTANT", "content": "可考虑布洛芬缓释胶囊"},
+    ]
+    response = post_consult(client, json={
+        "sessionId": "role-history", "question": question, "medicines": SAMPLE_MEDICINES,
+        "historyMessages": history, "history": history,
+    })
+    assert response.status_code == 200
+    assert {name for name, _ in calls} == {"IntentDecision", "ParsedSymptoms", "RiskReviewOutput", "render"}
+    expected = [
+        {"role": "user", "content": "我头痛两天"},
+        {"role": "assistant", "content": "可考虑布洛芬缓释胶囊"},
+    ]
+    for name, kwargs in calls:
+        assert kwargs["history"] == expected, name
+        assert "我头痛两天" not in kwargs["user"], name
+        assert "recentMessages" not in kwargs["user"], name
+        if name == "IntentDecision":
+            assert "history" not in json.loads(kwargs["user"])
 
 
 def _parse_sse_events(lines: Iterable[str]) -> list[dict[str, object]]:

@@ -60,31 +60,6 @@ export type AgentTraceStep = {
   error?: string | null;
 };
 
-export type AgentConsultInput = {
-  sessionId: string;
-  question: string;
-  userId?: string;
-  householdId?: string;
-  medicines: AgentMedicineBrief[];
-  members?: Array<{
-    id: string;
-    displayName: string;
-    userId?: string;
-    role?: string;
-  }>;
-  history?: Array<{
-    role: 'USER' | 'ASSISTANT';
-    content: string;
-  }>;
-  userProfile?: AgentUserProfile | null;
-  historyMessages?: AgentHistoryMessage[];
-  sessionSummary?: AgentSessionSummary | null;
-  conversationStatus?: 'active' | 'resolved' | 'stale' | 'closed';
-  allowRxRecommendation?: boolean;
-  timezone?: string;
-  now?: string;
-};
-
 export type AgentConsultOutput = {
   answer: string;
   recommends: AgentRecommend[];
@@ -92,20 +67,6 @@ export type AgentConsultOutput = {
   sessionSummary?: AgentSessionSummary | null;
   traces: AgentTraceStep[];
 };
-
-export type AgentConsultStreamEvent =
-  | {
-      type: 'status';
-      stage?: string;
-      message: string;
-    }
-  | {
-      type: 'answer_delta';
-      delta: string;
-    }
-  | ({
-      type: 'complete';
-    } & AgentConsultOutput);
 
 export type AgentAgUiRunInput = RunAgentInput;
 

@@ -6,13 +6,14 @@ from typing import Any
 from ...schemas import MedicineBrief, ParsedSymptoms, Recommend, SessionSummary
 from ...tracing import trace_node
 from ..context import merge_unique
+from .render import build_render_plan
 
 
 def make_summarize_node():
     async def summarize(state: dict[str, Any]) -> dict[str, Any]:
         existing: SessionSummary | None = state.get("session_summary")
         parsed: ParsedSymptoms = state["parsed"]
-        recommends: list[Recommend] = state.get("recommends") or []
+        recommends: list[Recommend] = build_render_plan(state).recommends
         decisions: list[dict[str, Any]] = state.get("review_decisions") or []
         candidates: list[MedicineBrief] = state.get("candidates") or []
         flags: list[str] = state.get("special_population_flags") or []

@@ -2,22 +2,18 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..schemas import HistoryMessage, SessionSummary
+from ..schemas import SessionSummary
+from ..llm.messages import HistoryChatMessage, conversation_history
+
+
+def history_chat_messages(state: dict[str, Any]) -> list[HistoryChatMessage]:
+    return conversation_history(state.get("history_messages") or [])
 
 
 def dump_conversation_context(state: dict[str, Any]) -> dict[str, Any]:
     summary: SessionSummary | None = state.get("session_summary")
-    messages: list[HistoryMessage] = state.get("history_messages") or []
     return {
         "sessionSummary": summary.model_dump(by_alias=True) if summary else None,
-        "recentMessages": [
-            {
-                "role": message.role,
-                "content": message.content,
-                "createdAt": message.created_at,
-            }
-            for message in messages
-        ],
         "conversationStatus": state.get("conversation_status") or "active",
     }
 

@@ -8,7 +8,6 @@ import { HouseholdsService } from '@/domains/households/households.service';
 import { RateLimitService } from '@/infrastructure/redis/rate-limit.service';
 import { AgentAgUiRunInput } from '../agent-client/agent-client.types';
 import { AgUiRunAgentDto } from './dto/ag-ui-run-agent.dto';
-import { AskConsultationDto } from './dto/ask-consultation.dto';
 import { QueryConsultationDto } from './dto/query-consultation.dto';
 import { RunConsultationDebugDto } from './dto/run-consultation-debug.dto';
 import { ConsultationService } from './consultation.service';
@@ -27,50 +26,6 @@ export class ConsultationController {
     private readonly householdsService: HouseholdsService,
     private readonly rateLimit: RateLimitService,
   ) {}
-
-  @Post('consultation/ask')
-  @UseGuards(AppJwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'App 发起一次问诊' })
-  async ask(
-    @Req() req: AppRequest,
-    @Headers('x-household-id') requestedHouseholdId: string | undefined,
-    @Body() dto: AskConsultationDto,
-  ) {
-    const current = await this.householdsService.resolveCurrentHousehold(req.user.appUserId, requestedHouseholdId);
-    return this.consultationService.ask(dto, current);
-  }
-
-  @Post('consultation/ask/stream')
-  @UseGuards(AppJwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'App 流式发起一次问诊' })
-  async askStream(
-    @Req() req: AppRequest,
-    @Headers('x-household-id') requestedHouseholdId: string | undefined,
-    @Body() dto: AskConsultationDto,
-    @Res() res: any,
-  ) {
-    const current = await this.householdsService.resolveCurrentHousehold(req.user.appUserId, requestedHouseholdId);
-
-    res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
-    res.setHeader('Cache-Control', 'no-cache, no-transform');
-    res.setHeader('Connection', 'keep-alive');
-    res.flushHeaders?.();
-
-    const writeEvent = (event: unknown) => {
-      res.write(`${JSON.stringify(event)}\n`);
-    };
-
-    try {
-      await this.consultationService.askStream(dto, current, writeEvent);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : '问诊服务暂不可用';
-      writeEvent({ type: 'error', message });
-    } finally {
-      res.end();
-    }
-  }
 
   @Post('consultation/ag-ui')
   @UseGuards(AppJwtAuthGuard)
