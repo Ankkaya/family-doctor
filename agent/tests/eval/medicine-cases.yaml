@@ -1,0 +1,19 @@
+# Tool-agent evaluation. Storage is a fixture; this does not measure real Embedding retrieval accuracy.
+cases:
+  - id: exact-name
+    question: 家里有布洛芬吗
+    medicines:
+      - id: ibu
+        name: 布洛芬
+        otc: OTC
+        indication: 头痛、发热
+        quantity: 3
+    expectedLookupAny: [ibu]
+  - id: exact-name-missing
+    question: 家里有阿莫西林吗
+    medicines: []
+    expectedReason: EXACT_NAME_NOT_FOUND
+  - id: empty-inventory
+    question: 列出家里的可用药品库存
+    medicines: []
+    expectedReason: NO_AVAILABLE_INVENTORY

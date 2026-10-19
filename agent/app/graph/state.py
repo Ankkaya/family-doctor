@@ -5,14 +5,22 @@ from typing import Annotated
 
 from typing_extensions import TypedDict
 
-from ..schemas import HistoryMessage, MedicineBrief, ParsedSymptoms, Recommend, SessionSummary, TraceStep, UserProfile
+from ..schemas import (
+    HistoryMessage,
+    MedicineBrief,
+    Recommend,
+    SessionSummary,
+    TraceStep,
+    UserProfile,
+)
 
 
 class GraphState(TypedDict, total=False):
     # Inputs
     session_id: str
     question: str
-    normalized_question: str
+    resolved_question: str
+    cabinet_scope: str
     medicines: list[MedicineBrief]
     user_profile: UserProfile
     history_messages: list[HistoryMessage]
@@ -20,16 +28,7 @@ class GraphState(TypedDict, total=False):
     conversation_status: str
     allow_rx_recommendation: bool
 
-    # Intermediate
-    parsed: ParsedSymptoms
-    emergency: bool
-    emergency_reasons: list[str]
-    special_population_flags: list[str]
     candidates: list[MedicineBrief]
-    review_decisions: list[dict[str, object]]
-    safety_warnings: list[str]
-    risk_level: str
-    risked: list[Recommend]
 
     # Outputs
     answer: str

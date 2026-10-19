@@ -1,15 +1,23 @@
 """与 NestJS 对齐的 DTO。字段名使用 camelCase 与 TS 侧一致。"""
+
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 OtcType = Literal["OTC", "RX"]
 
 
 class _CamelModel(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
+
+
+class MedicineReference(_CamelModel):
+    source: Literal["household_cabinet"]
+    inventory_id: str = Field(alias="inventoryId")
+    label: str
+    match_type: Literal["exact", "semantic", "inventory"] = Field(alias="matchType")
 
 
 class MedicineBrief(_CamelModel):
@@ -22,6 +30,9 @@ class MedicineBrief(_CamelModel):
     dosage: str | None = None
     search_score: float | None = Field(default=None, alias="searchScore")
     search_source: str | None = Field(default=None, alias="searchSource")
+    reference: MedicineReference | None = None
+    quantity: int | None = None
+    expire_at: str | None = Field(default=None, alias="expireAt")
 
 
 class UserProfile(_CamelModel):
@@ -74,6 +85,7 @@ class Recommend(_CamelModel):
     indication: str
     reason: str
     warnings: list[str] = Field(default_factory=list)
+    reference: MedicineReference | None = None
 
 
 class RiskReviewItem(_CamelModel):
@@ -104,6 +116,7 @@ class ConsultRequest(_CamelModel):
     question: str
     user_id: str | None = Field(default=None, alias="userId")
     household_id: str | None = Field(default=None, alias="householdId")
+    cabinet_scope: str | None = Field(default=None, alias="cabinetScope", exclude=True)
     medicines: list[MedicineBrief] = Field(default_factory=list)
     members: list[MemberBrief] = Field(default_factory=list)
     history: list[ConversationMessageBrief] = Field(default_factory=list)
@@ -128,26 +141,9 @@ class ConsultResponse(_CamelModel):
 
 
 class IntentDecision(_CamelModel):
-    intent: Literal[
-        "create_reminder",
-        "modify_reminder",
-        "delete_reminder",
-        "list_reminder",
-        "medicine_consult",
-        "medicine_search",
-        "medicine_entry",
-        "profile_update",
-        "smalltalk",
-        "unsupported",
-    ]
-    confidence: float = Field(ge=0, le=1)
-    task_type: Literal["medicine", "temperature", "cabinet", "other"] = Field(
-        default="other",
-        alias="taskType",
-    )
-    needs_clarification: bool = Field(default=False, alias="needsClarification")
-    missing_fields: list[str] = Field(default_factory=list, alias="missingFields")
-    reason: str = ""
+    model_config = ConfigDict(extra="forbid", strict=True)
+    profile: Literal["general", "medicine"]
+    content: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)]
 
 
 class ImageInput(_CamelModel):

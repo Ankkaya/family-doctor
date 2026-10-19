@@ -1,4 +1,5 @@
 """更新会话摘要，供长对话后续轮次压缩使用。"""
+
 from __future__ import annotations
 
 from typing import Any
@@ -17,7 +18,9 @@ def make_summarize_node():
         decisions: list[dict[str, Any]] = state.get("review_decisions") or []
         candidates: list[MedicineBrief] = state.get("candidates") or []
         flags: list[str] = state.get("special_population_flags") or []
-        question = state.get("normalized_question") or state.get("question") or ""
+        if state.get("emergency"):
+            flags = merge_unique(flags, state.get("emergency_reasons") or ["当前急症风险"])
+        question = state.get("question") or ""
 
         with trace_node(
             "summarize",
@@ -27,40 +30,64 @@ def make_summarize_node():
                 "recommendCount": len(recommends),
             },
         ) as rec:
-            recommended_names = [item.name for item in recommends]
-            rejected_names = [
-                str(item.get("name"))
-                for item in decisions
-                if item.get("name") and not item.get("suitable")
-            ]
-            mentioned_names = merge_unique(
-                [medicine.name for medicine in candidates],
-                recommended_names,
-                rejected_names,
-            )
-            temporary_facts = extract_temporary_user_facts(question)
-            unresolved = [] if parsed.emergency or recommends or decisions else ["需要补充症状细节或就医咨询"]
-            suggested_status = "resolved" if parsed.emergency or recommends or not unresolved else "active"
-
-            updated = SessionSummary(
-                chiefComplaint=build_chief_complaint(parsed, existing),
-                symptoms=merge_unique(existing.symptoms if existing else [], parsed.symptoms),
-                duration=parsed.duration or (existing.duration if existing else None),
-                riskFlags=merge_unique(existing.risk_flags if existing else [], flags),
-                mentionedMedicines=merge_unique(existing.mentioned_medicines if existing else [], mentioned_names),
-                rejectedMedicines=merge_unique(existing.rejected_medicines if existing else [], rejected_names),
-                recommendedMedicines=merge_unique(
-                    existing.recommended_medicines if existing else [],
+            if state.get("medicine_task") in {"drug_info", "inventory"} and not state.get(
+                "emergency"
+            ):
+                # Reading a leaflet or inventory is not evidence of the user's symptoms/allergies.
+                updated = (existing or SessionSummary()).model_copy(
+                    update={
+                        "mentioned_medicines": merge_unique(
+                            existing.mentioned_medicines if existing else [],
+                            [medicine.name for medicine in candidates],
+                        ),
+                        "last_topic": (state.get("resolved_question") or question)[:80],
+                    }
+                )
+            else:
+                recommended_names = [item.name for item in recommends]
+                rejected_names = [
+                    str(item.get("name"))
+                    for item in decisions
+                    if item.get("name") and not item.get("suitable")
+                ]
+                mentioned_names = merge_unique(
+                    [medicine.name for medicine in candidates],
                     recommended_names,
-                ),
-                temporaryUserFacts=merge_unique(
-                    existing.temporary_user_facts if existing else [],
-                    temporary_facts,
-                ),
-                unresolvedQuestions=unresolved,
-                lastTopic=", ".join(parsed.symptoms) if parsed.symptoms else question[:40],
-                suggestedStatus=suggested_status,
-            )
+                    rejected_names,
+                )
+                temporary_facts = extract_temporary_user_facts(question)
+                unresolved = (
+                    []
+                    if parsed.emergency or recommends or decisions
+                    else ["需要补充症状细节或就医咨询"]
+                )
+                suggested_status = (
+                    "resolved" if parsed.emergency or recommends or not unresolved else "active"
+                )
+
+                updated = SessionSummary(
+                    chiefComplaint=build_chief_complaint(parsed, existing),
+                    symptoms=merge_unique(existing.symptoms if existing else [], parsed.symptoms),
+                    duration=parsed.duration or (existing.duration if existing else None),
+                    riskFlags=merge_unique(existing.risk_flags if existing else [], flags),
+                    mentionedMedicines=merge_unique(
+                        existing.mentioned_medicines if existing else [], mentioned_names
+                    ),
+                    rejectedMedicines=merge_unique(
+                        existing.rejected_medicines if existing else [], rejected_names
+                    ),
+                    recommendedMedicines=merge_unique(
+                        existing.recommended_medicines if existing else [],
+                        recommended_names,
+                    ),
+                    temporaryUserFacts=merge_unique(
+                        existing.temporary_user_facts if existing else [],
+                        temporary_facts,
+                    ),
+                    unresolvedQuestions=unresolved,
+                    lastTopic=", ".join(parsed.symptoms) if parsed.symptoms else question[:40],
+                    suggestedStatus=suggested_status,
+                )
             rec.set_output(updated.model_dump(by_alias=True))
 
         return {"updated_session_summary": updated, "traces": [rec.step]}

@@ -1,3 +1,4 @@
+process.env.AGENT_INTERNAL_TOKEN = 'unit-test-token';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ConsultationService } from './consultation.service';
 
@@ -64,14 +65,20 @@ describe('ConsultationService household isolation', () => {
     const audioStreamerService = {
       createAgUi: jest.fn(),
     };
+    const historyCache = {
+      get: jest.fn().mockResolvedValue(null),
+      seed: jest.fn().mockResolvedValue(undefined),
+      append: jest.fn().mockResolvedValue(true),
+      invalidate: jest.fn().mockResolvedValue(undefined),
+    };
     const service = new ConsultationService(
       prisma as any,
-      cabinetService as any,
       agentClient as any,
       householdsService as any,
       audioStreamerService as any,
+      historyCache as any,
     );
-    return { service, prisma, tx, committed, cabinetService, agentClient };
+    return { service, prisma, tx, committed, cabinetService, agentClient, historyCache };
   }
 
   it('rejects continuing a session that belongs to another household', async () => {
@@ -110,18 +117,15 @@ describe('ConsultationService household isolation', () => {
       },
     );
 
-    expect(cabinetService.findAgentBriefsByHousehold).toHaveBeenCalledWith('household-1', '头痛怎么办');
+    expect(cabinetService.findAgentBriefsByHousehold).not.toHaveBeenCalled();
     expect(agentClient.agUiStream).toHaveBeenCalledWith(expect.objectContaining({
       forwardedProps: expect.objectContaining({
       userProfile: expect.objectContaining({
         age: 30,
         gender: 'male',
       }),
-      medicines: [
-        expect.objectContaining({
-          id: 'med-1',
-        }),
-      ],
+      medicines: [],
+      cabinetScope: expect.any(String),
       }),
     }), expect.any(Function));
   });
@@ -284,6 +288,70 @@ describe('ConsultationService household isolation', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
     expect(tx.$executeRaw).not.toHaveBeenCalled();
     expect(committed).toEqual([]);
+  });
+
+  it.each([false, true])('uses Redis without querying PostgreSQL messages (empty=%s)', async empty => {
+    const { service, prisma, agentClient, historyCache } = createService([]);
+    const cached = empty ? [] : [{ id: 'cached-1', role: 'USER', content: '缓存中的问题', createdAt: '2026-10-19T00:00:00.000Z' }];
+    historyCache.get.mockResolvedValueOnce(cached);
+    await ask(service, { sessionId: 'session-1', question: '头痛怎么办' }, { appUserId: 'app-user-1', householdId: 'household-1' });
+    const queries = prisma.$queryRaw.mock.calls.map(call => call[0].sql);
+    expect(queries.filter(query => query.includes('FROM consultation_message'))).toHaveLength(0);
+    expect(agentClient.agUiStream.mock.calls[0][0].forwardedProps.historyMessages).toEqual(cached);
+    expect(historyCache.seed).not.toHaveBeenCalled();
+    expect(historyCache.append).toHaveBeenCalledWith('session-1', [
+      expect.objectContaining({ role: 'USER', content: '头痛怎么办' }),
+      expect.objectContaining({ role: 'ASSISTANT', content: '建议先休息并观察。' }),
+    ]);
+  });
+
+  it('fills a cache miss from PostgreSQL before generating the answer', async () => {
+    const { service, prisma, historyCache, agentClient } = createService([]);
+    const row = { id: 'db-1', role: 'ASSISTANT', content: '此前回答', createdAt: new Date('2026-10-19T00:00:00Z') };
+    prisma.$queryRaw.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([row]);
+    await ask(service, { sessionId: 'session-1', question: '头痛怎么办' }, { appUserId: 'app-user-1', householdId: 'household-1' });
+    expect(historyCache.seed).toHaveBeenCalledWith('session-1', [{ ...row, createdAt: row.createdAt.toISOString() }]);
+    expect(historyCache.seed.mock.invocationCallOrder[0]).toBeLessThan(agentClient.agUiStream.mock.invocationCallOrder[0]);
+    expect(historyCache.append.mock.invocationCallOrder[0]).toBeGreaterThan(prisma.$transaction.mock.invocationCallOrder[0]);
+  });
+
+  it('refreshes an expired cache from PostgreSQL before appending committed messages', async () => {
+    const { service, prisma, historyCache } = createService([]);
+    historyCache.get.mockResolvedValueOnce([]);
+    historyCache.append.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    prisma.$queryRaw.mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    await ask(service, { sessionId: 'session-1', question: '头痛怎么办' }, { appUserId: 'app-user-1', householdId: 'household-1' });
+    expect(historyCache.seed).toHaveBeenCalledWith('session-1', []);
+    expect(historyCache.append).toHaveBeenCalledTimes(2);
+    expect(prisma.$queryRaw.mock.calls.filter(call => call[0].sql.includes('FROM consultation_message'))).toHaveLength(1);
+  });
+
+  it('returns success after PostgreSQL commit even when Redis writes fail', async () => {
+    const { service, committed, historyCache } = createService([]);
+    historyCache.seed.mockRejectedValue(new Error('Redis offline'));
+    historyCache.append.mockRejectedValue(new Error('Redis offline'));
+    historyCache.invalidate.mockRejectedValue(new Error('Redis offline'));
+    expect((await ask(service, { sessionId: 'session-1', question: '头痛怎么办' }, { appUserId: 'app-user-1', householdId: 'household-1' })).sessionId).toBe('session-1');
+    expect(committed).toHaveLength(4);
+  });
+
+  it('does not append an uncommitted turn to Redis', async () => {
+    const { service, tx, historyCache } = createService([]);
+    tx.$executeRaw.mockRejectedValueOnce(new Error('事务失败'));
+    expect((await ask(service, { sessionId: 'session-1', question: '头痛怎么办' }, { appUserId: 'app-user-1', householdId: 'household-1' })).sessionId).toBe('');
+    expect(historyCache.append).not.toHaveBeenCalled();
+  });
+
+  it('does not read history cache before session authorization', async () => {
+    const { service, historyCache } = createService([{ id: 'session-1', householdId: 'other', deletedAt: null }]);
+    await expect(ask(service, { sessionId: 'session-1', question: '头痛怎么办' }, { appUserId: 'app-user-1', householdId: 'household-1' })).rejects.toBeInstanceOf(ForbiddenException);
+    expect(historyCache.get).not.toHaveBeenCalled();
+  });
+
+  it('invalidates history when a session is soft deleted', async () => {
+    const { service, historyCache } = createService([]);
+    await service.removeAdmin('session-1');
+    expect(historyCache.invalidate).toHaveBeenCalledWith('session-1');
   });
 
   it('uses AG-UI for admin debugging and returns its collected result', async () => {

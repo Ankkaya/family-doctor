@@ -16,7 +16,7 @@ export class AgentClientService {
   }
 
   private getTimeoutMs() {
-    return Number(process.env.AGENT_TIMEOUT_MS || 30000);
+    return Number(process.env.AGENT_TIMEOUT_MS || 120000);
   }
 
   private getHeaders(accept?: string) {

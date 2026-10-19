@@ -157,6 +157,12 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     return Number(await this.client.ttl(key));
   }
 
+  // Optional caches must not queue indefinitely while Redis is disconnected.
+  async cacheCommand(args: string[]): Promise<unknown> {
+    if (!this.client.isReady) throw new Error('Redis cache unavailable');
+    return this.client.sendCommand(args, { abortSignal: AbortSignal.timeout(500) });
+  }
+
   private buildTokenKey(userId: number, type: TokenType): string {
     return `token:${type}:${userId}`;
   }

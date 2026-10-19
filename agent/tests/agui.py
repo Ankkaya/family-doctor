@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import json as jsonlib
 import uuid
 from collections.abc import Iterable
 
@@ -33,7 +34,10 @@ def run_input(payload: dict) -> dict:
 
 
 def post_consult(client: TestClient, *, json: dict, headers: dict | None = None) -> httpx.Response:
-    response = client.post("/agent/ag-ui", json=run_input(json), headers={
+    payload = dict(json)
+    if getattr(client.app.state, "cabinet_test_inventory", False):
+        payload["cabinetScope"] = "test:" + jsonlib.dumps(payload.pop("medicines", []))
+    response = client.post("/agent/ag-ui", json=run_input(payload), headers={
         "Accept": "text/event-stream", **(headers or {}),
     })
     if response.status_code != 200:

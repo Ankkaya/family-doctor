@@ -4,8 +4,6 @@ import uuid
 from collections.abc import AsyncIterator
 from typing import Any
 
-from fastapi import APIRouter, Depends, Request
-from fastapi.responses import StreamingResponse
 from ag_ui.core import (
     CustomEvent,
     EventType,
@@ -20,38 +18,26 @@ from ag_ui.core import (
     TextMessageEndEvent,
     TextMessageStartEvent,
 )
-
-from ..security import require_agent_token
 from ag_ui.encoder import EventEncoder
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import StreamingResponse
 
-from ..graph.nodes.render import (
-    RENDER_PROMPT_KEY,
-    RENDER_PROMPT_VERSION,
-    RENDER_SYSTEM,
-    build_render_plan,
-)
+from ..graph.nodes.general import generate_general_reply
 from ..schemas import ConsultRequest, ConsultResponse, IntentDecision
+from ..security import require_agent_token
 from ..tools.intent_router import (
-    LOW_CONFIDENCE_THRESHOLD,
     classify_intent,
     should_run_consult_graph,
 )
-from ..tracing import trace_node
-from ..graph.context import history_chat_messages
 
 router = APIRouter(dependencies=[Depends(require_agent_token)])
 
 NODE_STATUS_MESSAGES = {
     "intent_router": "正在判断任务类型",
-    "preprocess": "正在整理问题描述",
-    "parse": "正在识别症状和持续时间",
-    "emergency": "正在检查急症风险",
-    "special_population": "正在检查特殊人群风险",
-    "match": "正在匹配家庭药箱药品",
-    "review": "正在审查药品适配性",
-    "safety": "正在进行安全审核",
-    "render": "正在组织回复",
-    "summarize": "正在更新会话摘要",
+    "general_reply": "正在生成交流回复",
+    "medicine": "正在查询药品并生成回复",
+    "medicine_lookup": "正在查询家庭药箱",
+    "retrieval_evaluation": "正在评估查询结果并按需重写",
 }
 
 
@@ -68,14 +54,17 @@ async def ag_ui(payload: RunAgentInput, request: Request) -> StreamingResponse:
                     thread_id=payload.thread_id,
                     run_id=payload.run_id,
                     parent_run_id=payload.parent_run_id,
-                    input=payload,
                 )
             )
             yield encoder.encode(
                 StateDeltaEvent(
                     type=EventType.STATE_DELTA,
                     delta=[
-                        {"op": "replace", "path": "/sessionId", "value": consult_payload.session_id},
+                        {
+                            "op": "replace",
+                            "path": "/sessionId",
+                            "value": consult_payload.session_id,
+                        },
                     ],
                 )
             )
@@ -97,14 +86,13 @@ async def ag_ui(payload: RunAgentInput, request: Request) -> StreamingResponse:
                         role="assistant",
                     )
                 )
-                for chunk in _iter_answer_chunks(routed_response.answer):
-                    yield encoder.encode(
-                        TextMessageContentEvent(
-                            type=EventType.TEXT_MESSAGE_CONTENT,
-                            message_id=message_id,
-                            delta=chunk,
-                        )
+                yield encoder.encode(
+                    TextMessageContentEvent(
+                        type=EventType.TEXT_MESSAGE_CONTENT,
+                        message_id=message_id,
+                        delta=routed_response.answer,
                     )
+                )
                 yield encoder.encode(
                     TextMessageEndEvent(
                         type=EventType.TEXT_MESSAGE_END,
@@ -132,6 +120,11 @@ async def ag_ui(payload: RunAgentInput, request: Request) -> StreamingResponse:
                                 "path": "/traces",
                                 "value": [_dump_alias(item) for item in routed_response.traces],
                             },
+                            {
+                                "op": "replace",
+                                "path": "/sessionSummary",
+                                "value": _dump_alias(routed_response.session_summary),
+                            },
                         ],
                     )
                 )
@@ -144,21 +137,24 @@ async def ag_ui(payload: RunAgentInput, request: Request) -> StreamingResponse:
                             "sessionId": consult_payload.session_id,
                             "messageId": message_id,
                             "answer": routed_response.answer,
-                            "recommends": [_dump_alias(item) for item in routed_response.recommends],
+                            "recommends": [
+                                _dump_alias(item) for item in routed_response.recommends
+                            ],
                             "disclaimer": routed_response.disclaimer,
                             "traces": [_dump_alias(item) for item in routed_response.traces],
+                            "sessionSummary": _dump_alias(routed_response.session_summary),
                         },
                     )
                 )
                 return
 
             graph = request.app.state.stream_graph
-            llm = request.app.state.llm
-            settings = request.app.state.settings
             state: dict[str, Any] = {
                 "session_id": consult_payload.session_id,
                 "question": consult_payload.question,
-                "medicines": consult_payload.medicines,
+                "resolved_question": intent.content,
+                "medicines": [],
+                "cabinet_scope": consult_payload.cabinet_scope,
                 "user_profile": consult_payload.user_profile,
                 "history_messages": consult_payload.history_messages,
                 "session_summary": consult_payload.session_summary,
@@ -215,68 +211,23 @@ async def ag_ui(payload: RunAgentInput, request: Request) -> StreamingResponse:
                         )
                     )
 
-            async for event in start_step("render"):
-                yield event
-            plan = build_render_plan(state)
             message_id = _message_id(payload)
+            answer = state["answer"]
             yield encoder.encode(
                 TextMessageStartEvent(
-                    type=EventType.TEXT_MESSAGE_START,
-                    message_id=message_id,
-                    role="assistant",
+                    type=EventType.TEXT_MESSAGE_START, message_id=message_id, role="assistant"
                 )
             )
-
-            with trace_node(
-                "render",
-                {
-                    "emergency": state["parsed"].emergency,
-                    "recommendCount": len(plan.recommends),
-                    "riskLevel": state.get("risk_level", "unknown"),
-                    "promptKey": RENDER_PROMPT_KEY,
-                    "promptVersion": RENDER_PROMPT_VERSION,
-                    "streaming": True,
-                    "protocol": "ag-ui",
-                },
-            ) as rec:
-                answer_parts: list[str] = []
-                if plan.prompt_used and plan.prompt_user:
-                    async for chunk in llm.chat_stream(system=RENDER_SYSTEM, user=plan.prompt_user, history=history_chat_messages(state)):
-                        answer_parts.append(chunk)
-                        yield encoder.encode(
-                            TextMessageContentEvent(
-                                type=EventType.TEXT_MESSAGE_CONTENT,
-                                message_id=message_id,
-                                delta=chunk,
-                            )
-                        )
-                else:
-                    answer_parts.append(plan.answer or "")
-                    for chunk in _iter_answer_chunks(answer_parts[0]):
-                        yield encoder.encode(
-                            TextMessageContentEvent(
-                                type=EventType.TEXT_MESSAGE_CONTENT,
-                                message_id=message_id,
-                                delta=chunk,
-                            )
-                        )
-
-                answer = "".join(answer_parts).strip()
-                rec.set_output({
-                    "answerLength": len(answer),
-                    "recommendCount": len(plan.recommends),
-                    "promptUsed": plan.prompt_used,
-                    "systemPrompt": RENDER_SYSTEM if plan.prompt_used else None,
-                    "userPrompt": plan.prompt_user,
-                    "historyMessages": history_chat_messages(state) if plan.prompt_used else [],
-                })
-                rec.set_llm(model=llm.model)
-
-            state.setdefault("traces", [])
-            state["traces"].append(rec.step)
+            yield encoder.encode(
+                TextMessageContentEvent(
+                    type=EventType.TEXT_MESSAGE_CONTENT, message_id=message_id, delta=answer
+                )
+            )
             session_summary = _dump_alias(state.get("updated_session_summary"))
-            recommends = [_dump_alias(item) for item in plan.recommends]
-            traces = [_dump_alias(item) for item in [*route_traces, *state["traces"]] if item is not None]
+            recommends = [_dump_alias(item) for item in state.get("recommends", [])]
+            traces = [
+                _dump_alias(item) for item in [*route_traces, *state["traces"]] if item is not None
+            ]
 
             if active_step:
                 yield encoder.encode(
@@ -295,7 +246,11 @@ async def ag_ui(payload: RunAgentInput, request: Request) -> StreamingResponse:
                         {"op": "replace", "path": "/messageId", "value": message_id},
                         {"op": "replace", "path": "/answer", "value": answer},
                         {"op": "replace", "path": "/recommends", "value": recommends},
-                        {"op": "replace", "path": "/disclaimer", "value": settings.disclaimer},
+                        {
+                            "op": "replace",
+                            "path": "/disclaimer",
+                            "value": request.app.state.settings.disclaimer,
+                        },
                         {"op": "replace", "path": "/traces", "value": traces},
                         {"op": "replace", "path": "/sessionSummary", "value": session_summary},
                     ],
@@ -311,7 +266,7 @@ async def ag_ui(payload: RunAgentInput, request: Request) -> StreamingResponse:
                         "messageId": message_id,
                         "answer": answer,
                         "recommends": recommends,
-                        "disclaimer": settings.disclaimer,
+                        "disclaimer": request.app.state.settings.disclaimer,
                         "traces": traces,
                         "sessionSummary": session_summary,
                     },
@@ -350,7 +305,8 @@ def _run_input_to_consult_request(payload: RunAgentInput) -> ConsultRequest:
         "question": question,
         "userId": forwarded.get("userId"),
         "householdId": forwarded.get("householdId"),
-        "medicines": forwarded.get("medicines") or [],
+        "medicines": [],
+        "cabinetScope": forwarded.get("cabinetScope"),
         "members": forwarded.get("members") or [],
         "history": forwarded.get("history") or [],
         "userProfile": forwarded.get("userProfile"),
@@ -413,10 +369,6 @@ def _dump_alias(value: Any) -> Any:
     return value
 
 
-def _iter_answer_chunks(answer: str, *, size: int = 12) -> list[str]:
-    return [answer[index:index + size] for index in range(0, len(answer), size)]
-
-
 def _merge_state(state: dict[str, Any], update: dict[str, Any]) -> None:
     for key, value in update.items():
         if key == "traces":
@@ -431,56 +383,32 @@ async def _route_request(
     payload: ConsultRequest,
     request: Request,
 ) -> tuple[IntentDecision, list[Any], ConsultResponse | None]:
-    intent, intent_trace = await classify_intent(llm=request.app.state.llm, payload=payload)
+    intent, intent_trace = await classify_intent(
+        llm=request.app.state.llm,
+        question=payload.question,
+        history_messages=payload.history_messages or payload.history,
+    )
     route_traces = [intent_trace] if intent_trace is not None else []
 
     if should_run_consult_graph(intent):
         return intent, route_traces, None
 
-    return intent, route_traces, _non_consult_response(
-        intent=intent,
-        traces=route_traces,
-        disclaimer=request.app.state.settings.disclaimer,
+    reply, reply_trace = await generate_general_reply(
+        llm=request.app.state.llm, payload=payload, intent=intent
     )
-
-
-def _non_consult_response(
-    *,
-    intent: IntentDecision,
-    traces: list[Any],
-    disclaimer: str,
-) -> ConsultResponse:
-    if intent.intent in {"create_reminder", "modify_reminder", "delete_reminder", "list_reminder"}:
-        answer = "定时任务已独立于问药咨询。请到个人中心的定时任务中查看和管理提醒。"
-        routed_disclaimer = "定时提醒仅用于辅助记录和提示，不替代医生或药师建议。"
-    elif intent.intent == "medicine_entry":
-        answer = "我已识别到你想录入药品。请使用药品录入入口上传药盒、说明书或手动填写药品信息。"
-        routed_disclaimer = disclaimer
-    elif intent.intent == "profile_update":
-        answer = "我已识别到你想更新个人或家庭成员资料。请到个人中心完善年龄、过敏史、基础病和长期用药等信息。"
-        routed_disclaimer = disclaimer
-    elif intent.intent == "smalltalk":
-        answer = "你好，我可以帮你做家庭药箱寻药咨询、药品信息查询和用药安全咨询。"
-        routed_disclaimer = disclaimer
-    elif intent.confidence < LOW_CONFIDENCE_THRESHOLD or intent.needs_clarification:
-        missing = (
-            f"还需要补充：{'、'.join(intent.missing_fields)}。"
-            if intent.missing_fields
-            else "请再补充一点目标或时间。"
-        )
-        answer = f"我还不确定要执行哪类任务。{missing}"
-        routed_disclaimer = disclaimer
-    else:
-        answer = "这个需求暂时超出家庭药箱 Agent 的处理范围。你可以问我家庭药箱寻药、药品信息或用药安全。"
-        routed_disclaimer = disclaimer
-
-    return ConsultResponse(
-        answer=answer,
-        recommends=[],
-        disclaimer=routed_disclaimer,
-        traces=[trace for trace in traces if trace is not None],
+    route_traces.append(reply_trace)
+    return (
+        intent,
+        route_traces,
+        ConsultResponse(
+            answer=reply,
+            recommends=[],
+            disclaimer=request.app.state.settings.disclaimer,
+            session_summary=payload.session_summary,
+            traces=[trace for trace in route_traces if trace is not None],
+        ),
     )
 
 
 def _status_for_routed_response(intent: IntentDecision) -> str:
-    return NODE_STATUS_MESSAGES["intent_router"]
+    return NODE_STATUS_MESSAGES["general_reply"]

@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     deepseek_api_key: str = ""
     deepseek_base_url: str = "https://api.deepseek.com"
 
-    backend_base_url: str = "http://127.0.0.1:3000"
+    backend_base_url: str = "http://127.0.0.1:3001"
     agent_internal_token: str = ""
     system_expiry_check_enabled: bool = True
     system_expiry_check_hour: int = 9

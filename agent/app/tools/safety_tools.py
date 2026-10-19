@@ -34,6 +34,7 @@ def build_recommendation(
         indication=medicine.indication,
         reason=build_reason(medicine, parsed),
         warnings=build_warnings(medicine, profile, flags),
+        reference=medicine.reference,
     )
 
 

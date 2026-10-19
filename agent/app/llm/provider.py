@@ -14,11 +14,24 @@ T = TypeVar("T", bound=BaseModel)
 class LLMProvider(Protocol):
     model: str
 
-    async def chat(self, *, system: str, user: str, history: list[HistoryChatMessage] | None = None) -> str: ...
+    def agent_model(self): ...
 
-    async def chat_stream(self, *, system: str, user: str, history: list[HistoryChatMessage] | None = None) -> AsyncIterator[str]: ...
+    async def chat(
+        self, *, system: str, user: str, history: list[HistoryChatMessage] | None = None
+    ) -> str: ...
 
-    async def structured(self, *, system: str, user: str, schema: type[T], history: list[HistoryChatMessage] | None = None) -> T: ...
+    async def chat_stream(
+        self, *, system: str, user: str, history: list[HistoryChatMessage] | None = None
+    ) -> AsyncIterator[str]: ...
+
+    async def structured(
+        self,
+        *,
+        system: str,
+        user: str,
+        schema: type[T],
+        history: list[HistoryChatMessage] | None = None,
+    ) -> T: ...
 
     async def structured_with_images(
         self,

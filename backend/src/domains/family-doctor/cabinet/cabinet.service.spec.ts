@@ -21,7 +21,7 @@ describe('CabinetService', () => {
         .mockResolvedValueOnce([{ count }]),
       $executeRaw: jest.fn().mockResolvedValue(1),
     };
-    const service = new CabinetService(prisma as any);
+    const service = new CabinetService(prisma as any, {} as any);
     return { service, prisma };
   }
 
@@ -193,7 +193,7 @@ describe('CabinetService', () => {
       },
     ], 1);
 
-    const result = await service.findAgentBriefsByHousehold('household-1');
+    const result = await service.searchForAgent('household-1', { mode: 'name', names: ['家庭自备药'], symptoms: '' });
 
     const sql = sqlText(prisma.$queryRaw.mock.calls[0][0]);
     expect(sql).toContain('household_medicine_inventory');
@@ -207,6 +207,9 @@ describe('CabinetService', () => {
         contraindication: '过敏者禁用',
         adverseReaction: null,
         dosage: null,
+        quantity: 1, expireAt: '2027-01-01',
+        searchScore: NaN, searchSource: 'exact',
+        reference: { source: 'household_cabinet', inventoryId: 'inventory-1', label: '家庭药箱', matchType: 'exact' },
       },
     ]);
   });

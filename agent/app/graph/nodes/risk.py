@@ -42,7 +42,7 @@ def make_risk_node(llm: LLMProvider):
             review = await llm.structured(
                 system=RISK_SYSTEM,
                 user=build_risk_review_prompt(
-                    question=state.get("normalized_question") or state.get("question") or "",
+                    question=state.get("question") or "",
                     parsed=parsed,
                     profile=profile,
                     flags=flags,

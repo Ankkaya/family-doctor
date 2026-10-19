@@ -2919,6 +2919,31 @@
         ]
       }
     },
+    "/agent-data/cabinet/search": {
+      "post": {
+        "operationId": "CabinetController_searchForAgent",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchCabinetToolDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Agent 按短期会话权限查询家庭药箱",
+        "tags": [
+          "家庭医生/家庭药箱"
+        ]
+      }
+    },
     "/medicine/cabinet": {
       "get": {
         "operationId": "CabinetController_findCabinet",
@@ -4812,6 +4837,43 @@
           "category",
           "name",
           "value"
+        ]
+      },
+      "SearchCabinetToolDto": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string",
+            "description": "后端签发的短期会话权限凭证",
+            "maxLength": 4096
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "name",
+              "symptom",
+              "inventory"
+            ]
+          },
+          "names": {
+            "maxItems": 10,
+            "description": "完整药名/别名；症状查询传空数组",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "symptoms": {
+            "type": "string",
+            "maxLength": 1000,
+            "description": "症状检索文本；药名查询传空字符串"
+          }
+        },
+        "required": [
+          "scope",
+          "mode",
+          "names",
+          "symptoms"
         ]
       },
       "CreateCabinetInventoryDto": {

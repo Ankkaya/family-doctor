@@ -7,10 +7,11 @@ import { VoiceModule } from '../voice/voice.module';
 import { ConsultationController } from './consultation.controller';
 import { ConsultationService } from './consultation.service';
 import { ConsultationAudioStreamerService } from './consultation-audio-streamer.service';
+import { ConsultationHistoryCacheService } from './consultation-history-cache.service';
 
 @Module({
   imports: [PrismaModule, AgentClientModule, CabinetModule, VoiceModule, HouseholdsModule],
   controllers: [ConsultationController],
-  providers: [ConsultationService, ConsultationAudioStreamerService],
+  providers: [ConsultationService, ConsultationAudioStreamerService, ConsultationHistoryCacheService],
 })
 export class ConsultationModule {}

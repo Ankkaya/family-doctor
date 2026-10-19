@@ -1,4 +1,5 @@
 """特殊人群规则判断节点。"""
+
 from __future__ import annotations
 
 from typing import Any
@@ -13,7 +14,7 @@ def make_special_population_node():
         profile: UserProfile | None = state.get("user_profile")
         summary: SessionSummary | None = state.get("session_summary")
         parsed: ParsedSymptoms = state["parsed"]
-        question = state.get("normalized_question") or state["question"]
+        question = state["question"]
         with trace_node(
             "special_population",
             {

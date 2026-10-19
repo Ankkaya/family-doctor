@@ -1,4 +1,7 @@
-import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, Headers, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { PrismaService } from '@/infrastructure/prisma/prisma.service';
+import { verifyCabinetScope } from './cabinet-tool-scope';
+import { SearchCabinetToolDto } from './dto/search-cabinet-tool.dto';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { RequirePermissions } from '@/auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
@@ -23,7 +26,31 @@ export class CabinetController {
   constructor(
     private readonly cabinetService: CabinetService,
     private readonly householdsService: HouseholdsService,
+    private readonly prisma: PrismaService,
   ) {}
+
+  @Post('agent-data/cabinet/search')
+  @ApiOperation({ summary: 'Agent 按短期会话权限查询家庭药箱' })
+  async searchForAgent(@Headers('x-agent-token') token: string | undefined, @Body() dto: SearchCabinetToolDto) {
+    if (!process.env.AGENT_INTERNAL_TOKEN || token !== process.env.AGENT_INTERNAL_TOKEN) throw new ForbiddenException('Agent token 无效');
+    const invalid = dto.mode === 'name'
+      ? !dto.names.some(name => name.trim()) || Boolean(dto.symptoms.trim())
+      : dto.mode === 'inventory'
+        ? Boolean(dto.names.length) || Boolean(dto.symptoms.trim())
+        : Boolean(dto.names.length) || !dto.symptoms.trim();
+    if (invalid) throw new BadRequestException('药名、症状与库存查询参数不能混用');
+    const scope = verifyCabinetScope(dto.scope);
+    const user = await this.prisma.appUser.findFirst({ where: { id: scope.userId, deletedAt: null, status: 'active' }, select: { id: true } });
+    if (!user) throw new ForbiddenException('用户不可用');
+    const current = await this.householdsService.resolveCurrentHousehold(scope.userId, scope.householdId);
+    if (!scope.debug) {
+      const session = await this.prisma.consultationSession.findFirst({
+        where: { id: scope.sessionId, householdId: current.householdId, deletedAt: null }, select: { id: true },
+      });
+      if (!session) throw new ForbiddenException('会话不可用');
+    }
+    return this.cabinetService.searchForAgent(current.householdId, dto);
+  }
 
   @Get('medicine/cabinet')
   @UseGuards(AppJwtAuthGuard)

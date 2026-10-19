@@ -18,7 +18,7 @@ from .services.system_expiry_scheduler import run_system_expiry_scheduler
 async def lifespan(app: FastAPI):
     settings = get_settings()
     llm = get_llm_provider(settings)
-    stream_graph = build_graph(llm=llm)
+    stream_graph = build_graph(llm=llm, settings=settings)
     app.state.llm = llm
     app.state.stream_graph = stream_graph
     app.state.settings = settings

@@ -1,25 +1,29 @@
-"""离线评测：加载 cases.yaml，跑 Agent，断言期望命中。
+"""离线评测：加载 medicine-cases.yaml，跑 Agent，断言期望命中。
 
 用法：
   uv run python tests/eval/run_eval.py
   LLM_PROVIDER=deepseek DEEPSEEK_API_KEY=xxx uv run python tests/eval/run_eval.py
 """
+
 from __future__ import annotations
 
 import asyncio
+import json
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 import yaml
 from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from app.main import create_app  # noqa: E402
 from app.config import get_settings  # noqa: E402
+from app.main import create_app  # noqa: E402
+from app.schemas import MedicineBrief
 from tests.agui import post_consult  # noqa: E402
 
-CASES_PATH = Path(__file__).parent / "cases.yaml"
+CASES_PATH = Path(__file__).parent / "medicine-cases.yaml"
 
 
 def run() -> int:
@@ -29,9 +33,22 @@ def run() -> int:
     pass_cnt = 0
     fail: list[tuple[str, str]] = []
 
-    with TestClient(create_app(), headers={"x-agent-token": get_settings().agent_internal_token}) as client:
+    # Offline evaluation mocks only the authorized storage-tool boundary, not native model/tool selection or the retry middleware.
+    async def fixture_lookup(*, settings, scope, call):
+        return [
+            MedicineBrief.model_validate(item) for item in json.loads(scope.removeprefix("test:"))
+        ]
+
+    with (
+        patch("app.medicine.tools.search_household_cabinet", fixture_lookup),
+        TestClient(
+            create_app(), headers={"x-agent-token": get_settings().agent_internal_token}
+        ) as client,
+    ):
+        client.app.state.cabinet_test_inventory = True
         for case in cases:
-            r = post_consult(client,
+            r = post_consult(
+                client,
                 json={
                     "sessionId": case["id"],
                     "question": case["question"],
@@ -43,22 +60,25 @@ def run() -> int:
                 continue
 
             body = r.json()
-            recs = body.get("recommends", [])
-            rec_ids = {x["medicineId"] for x in recs}
-
-            if case.get("emergency"):
-                if recs:
-                    fail.append((case["id"], f"expected empty but got {rec_ids}"))
-                    continue
-            else:
-                expected_any = set(case.get("expectedAny") or [])
-                forbid = set(case.get("forbidIds") or [])
-                if expected_any and not (rec_ids & expected_any):
-                    fail.append((case["id"], f"expected any of {expected_any}, got {rec_ids}"))
-                    continue
-                if rec_ids & forbid:
-                    fail.append((case["id"], f"forbidden ids leaked: {rec_ids & forbid}"))
-                    continue
+            trace = next(
+                (item for item in body.get("traces", []) if item["nodeName"] == "medicine"), None
+            )
+            if not trace or not 1 <= trace["output"]["mainModelCalls"] <= 2:
+                fail.append((case["id"], "missing medicine run or invalid main-model budget"))
+                continue
+            outcomes = trace["output"]["lookupResults"]
+            found = {item["id"] for outcome in outcomes for item in outcome.get("items", [])}
+            expected = set(case.get("expectedLookupAny") or [])
+            if expected and not found.intersection(expected):
+                fail.append((case["id"], f"expected lookup result {expected}, got {found}"))
+                continue
+            reason = case.get("expectedReason")
+            if reason and not any(outcome.get("reasonCode") == reason for outcome in outcomes):
+                fail.append((case["id"], f"expected lookup reason {reason}"))
+                continue
+            if not body.get("answer"):
+                fail.append((case["id"], "empty answer"))
+                continue
 
             pass_cnt += 1
 

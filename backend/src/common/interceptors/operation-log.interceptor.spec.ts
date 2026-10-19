@@ -13,6 +13,13 @@ function createContext(request: Record<string, any>, response: Record<string, an
 }
 
 describe('OperationLogInterceptor', () => {
+  it('does not persist read-only cabinet tool credentials or results in operation logs', async () => {
+    const prisma = { operationLog: { create: jest.fn() } };
+    const interceptor = new OperationLogInterceptor(prisma as any);
+    await lastValueFrom(interceptor.intercept(createContext({ method: 'POST', originalUrl: '/agent-data/cabinet/search', body: { scope: 'secret' } }), { handle: () => of([{ name: 'private medicine' }]) } as any));
+    await new Promise(resolve => setImmediate(resolve));
+    expect(prisma.operationLog.create).not.toHaveBeenCalled();
+  });
   it('records failed write operations with path, method, status and sanitized body', async () => {
     const prisma = {
       operationLog: {

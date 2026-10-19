@@ -1,4 +1,5 @@
 """急症规则判断节点。命中后后续节点不再产生推荐。"""
+
 from __future__ import annotations
 
 from typing import Any
@@ -32,11 +33,17 @@ EMERGENCY_KEYWORDS = {
 
 def make_emergency_node():
     async def emergency(state: dict[str, Any]) -> dict[str, Any]:
-        question = state.get("normalized_question") or state["question"]
+        question = state["question"]
         parsed: ParsedSymptoms = state["parsed"]
-        with trace_node("emergency", {"question": question, "parsedEmergency": parsed.emergency}) as rec:
-            reasons = [reason for keyword, reason in EMERGENCY_KEYWORDS.items() if keyword in question]
-            is_emergency = parsed.emergency or bool(reasons)
+        with trace_node(
+            "emergency", {"question": question, "parsedEmergency": parsed.emergency}
+        ) as rec:
+            reasons = (
+                [reason for keyword, reason in EMERGENCY_KEYWORDS.items() if keyword in question]
+                if state.get("medicine_task", "medication_advice") == "medication_advice"
+                else []
+            )
+            is_emergency = bool(state.get("emergency")) or parsed.emergency or bool(reasons)
             rec.set_output({"emergency": is_emergency, "reasons": reasons})
         return {
             "emergency": is_emergency,

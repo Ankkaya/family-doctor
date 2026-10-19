@@ -116,6 +116,7 @@ export class OperationLogInterceptor implements NestInterceptor {
       /^\/?upload-records\//,
       /^\/?health/,
       /^\/?public-key/,
+      /^\/?agent-data\/cabinet\/search$/,
     ];
     if (skipPatterns.some(p => p.test(normalizedPath))) {
       return false;

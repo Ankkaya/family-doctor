@@ -20,17 +20,19 @@ app/
     medicine.py      POST /agent/medicine/recognize-images
   graph/
     state.py         LangGraph State
-    builder.py       构图: preprocess -> parse -> emergency -> special_population -> match -> review -> safety -> summarize；图外流式 render
-    nodes/
-      parse.py       症状结构化
-      match.py       药品召回 (纯 Python 关键词匹配, v1)
-      risk.py        风险提示
-      render.py      组装最终答复
+    builder.py       medicine 执行入口，无任务规划和三类任务路径
+    nodes/general.py general 一次性文本回复
+  medicine/
+    agent.py         LangChain create_agent；注册工具，主模型最多两次
+    tools.py         权限受限药品查询工具，返回记录或具体失败原因
+    runtime.py       每轮独立上下文、记录及执行追踪
   llm/
     provider.py      LLMProvider 抽象
     openai_provider.py OpenAI / DeepSeek 复用同一 OpenAI 兼容 SDK
 
-prompts/consult.v1.md            问诊 Prompt
+prompts/medicine.system.v2.md    medicine 主提示词
+prompts/medicine_rewrite.system.v1.md 检索切题评估与重写提示词
+prompts/general.system.v2.md     general 主提示词
 prompts/medicine_recognize.v1.md 图片识别 Prompt
 tests/eval/             评测骨架
 ```
@@ -75,3 +77,10 @@ uv run python tests/eval/run_eval.py    # 跑离线评测集
 docker build -t family-doctor-agent .
 docker run --rm -p 8000:8000 --env-file .env family-doctor-agent
 ```
+
+## medicine 调用预算
+
+主模型通过 LangChain 原生工具调用查询药品，`ModelCallLimitMiddleware(run_limit=2)` 限制每轮最多两次实际主模型调用，工具后的续答也计入。不再执行任务规划、固定症状解析/适配审查链或额外 render 模型。
+`search_household_cabinet` 内部依次完成检索、切题评估与必要的参数重写。切题则返回回答及已验证 ID 的引用；第 1 轮不切题（含零结果）则用辅助模型生成的 query 直接再次检索，第 2 轮结束。每次工具调用最多检索 2 轮、评估 2 次、重写 1 次，不回到主模型、不追加 HumanMessage。主模型最多 2 次（调用工具、读取最终结果回复），与工具内部预算独立。未采纳记录仅保留执行追踪。
+第2次主模型仍请求工具时，工具可完成执行，然后直接用工具结果或失败原因形成答复，不请求第3次主模型。查询失败明确区分无匹配、无可用库存、权限错误和服务异常。
+药品记录仅作资料引用，不自动产生推荐卡片；系统提示词负责用药风险提醒及缺失信息澄清，不能把查询结果当作适用性结论。

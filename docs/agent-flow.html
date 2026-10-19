@@ -6,9 +6,10 @@
   <title>家庭药箱 · Agent 执行流程</title>
   <style>
     :root{color-scheme:light;--bg:#f4f6fa;--surface:#fff;--ink:#192b3b;--muted:#607083;--line:#d8e1e9;--accent:#087b73;--soft:#eaf6f3;--violet:#7055a2}
-    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 "Segoe UI","Microsoft YaHei",sans-serif}main{max-width:1180px;margin:auto;padding:48px 28px}header{margin-bottom:32px}.eyebrow{font-size:12px;letter-spacing:2px;color:var(--accent);font-weight:600}h1{font-size:32px;line-height:1.3;margin:10px 0}h2{font-size:20px;margin:0}h3{font-size:16px;margin:0}p{margin:8px 0;color:var(--muted)}code{font:12px/1.5 Consolas,monospace;color:var(--muted);overflow-wrap:anywhere}.meta{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}.badge{border-radius:20px;padding:4px 12px;background:var(--soft);color:var(--accent);font-size:12px}.panel{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:28px;margin-bottom:24px}.section-head{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:24px}.section-num{color:var(--muted);font-size:12px;letter-spacing:1px}.trunk{max-width:540px;margin:auto}.node{border:1px solid var(--line);border-radius:10px;padding:12px 16px;background:var(--surface);text-align:center}.node strong{display:block;font-weight:600}.node small{display:block;color:var(--muted);font-size:12px;margin-top:3px}.highlight{background:var(--soft);border-color:#a6d3c9}.arrow{text-align:center;color:#8595a4;height:28px;line-height:28px;font-size:20px}.branches{display:grid;grid-template-columns:1.6fr 1fr 1fr;gap:24px;align-items:start;position:relative;margin-top:24px}.lane{min-width:0}.lane-label{text-align:center;font-size:12px;color:var(--muted);margin-bottom:12px;padding-top:12px;border-top:2px solid var(--line)}.lane:first-child .lane-label{border-color:var(--accent);color:var(--accent)}.step{display:flex;align-items:center;gap:12px;text-align:left}.step .index{flex-shrink:0;width:25px;height:25px;border-radius:50%;background:var(--soft);color:var(--accent);font-size:12px;display:grid;place-items:center}.step code{display:block}.aside{font-size:13px;margin-top:16px;line-height:1.8}.result{background:#f4f7fa}.controls{display:flex;gap:8px;flex-wrap:wrap;margin:20px 0 12px}button{font:inherit;font-size:12px;padding:7px 12px;border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:7px;cursor:pointer}button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}button:focus-visible{outline:3px solid #65bfb4;outline-offset:3px}.response{padding:14px;border:1px dashed #9ec9c2;border-radius:10px}.response .order{font-weight:600;color:var(--accent)}.response p{font-size:12px;margin-bottom:0}.independent{border-top:3px solid var(--violet)}.independent .badge{background:#f0ecf8;color:var(--violet)}.job-grid{display:grid;grid-template-columns:1fr 1.6fr;gap:28px}.job-path{display:grid;grid-template-columns:1fr 26px 1fr 26px 1fr;align-items:center}.job-path .arrow{height:auto}.note{font-size:13px;border-left:3px solid var(--line);padding-left:14px;margin-top:22px}.legend{display:flex;gap:24px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:22px}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-right:6px}.dot.purple{background:var(--violet)}footer{font-size:12px;color:var(--muted)}details{margin-top:16px}summary{cursor:pointer;color:var(--muted)}details ul{padding-left:20px}a{color:var(--accent)}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 "Segoe UI","Microsoft YaHei",sans-serif}main{max-width:1180px;margin:auto;padding:48px 28px}header{margin-bottom:32px}.eyebrow{font-size:12px;letter-spacing:2px;color:var(--accent);font-weight:600}h1{font-size:32px;line-height:1.3;margin:10px 0}h2{font-size:20px;margin:0}h3{font-size:16px;margin:0}p{margin:8px 0;color:var(--muted)}code{font:12px/1.5 Consolas,monospace;color:var(--muted);overflow-wrap:anywhere}.meta{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}.badge{border-radius:20px;padding:4px 12px;background:var(--soft);color:var(--accent);font-size:12px}.panel{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:28px;margin-bottom:24px}.section-head{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:24px}.section-num{color:var(--muted);font-size:12px;letter-spacing:1px}.trunk{max-width:540px;margin:auto}.node{border:1px solid var(--line);border-radius:10px;padding:12px 16px;background:var(--surface);text-align:center}.node strong{display:block;font-weight:600}.node small{display:block;color:var(--muted);font-size:12px;margin-top:3px}.highlight{background:var(--soft);border-color:#a6d3c9}.arrow{text-align:center;color:#8595a4;height:28px;line-height:28px;font-size:20px}.branches{display:grid;grid-template-columns:1.6fr 1fr;gap:24px;align-items:start;position:relative;margin-top:24px}.lane{min-width:0}.lane-label{text-align:center;font-size:12px;color:var(--muted);margin-bottom:12px;padding-top:12px;border-top:2px solid var(--line)}.lane:first-child .lane-label{border-color:var(--accent);color:var(--accent)}.step{display:flex;align-items:center;gap:12px;text-align:left}.step .index{flex-shrink:0;width:25px;height:25px;border-radius:50%;background:var(--soft);color:var(--accent);font-size:12px;display:grid;place-items:center}.step code{display:block}.aside{font-size:13px;margin-top:16px;line-height:1.8}.result{background:#f4f7fa}.controls{display:flex;gap:8px;flex-wrap:wrap;margin:20px 0 12px}button{font:inherit;font-size:12px;padding:7px 12px;border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:7px;cursor:pointer}button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}button:focus-visible{outline:3px solid #65bfb4;outline-offset:3px}.response{padding:14px;border:1px dashed #9ec9c2;border-radius:10px}.response .order{font-weight:600;color:var(--accent)}.response p{font-size:12px;margin-bottom:0}.independent{border-top:3px solid var(--violet)}.independent .badge{background:#f0ecf8;color:var(--violet)}.job-grid{display:grid;grid-template-columns:1fr 1.6fr;gap:28px}.job-path{display:grid;grid-template-columns:1fr 26px 1fr 26px 1fr;align-items:center}.job-path .arrow{height:auto}.note{font-size:13px;border-left:3px solid var(--line);padding-left:14px;margin-top:22px}.legend{display:flex;gap:24px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:22px}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-right:6px}.dot.purple{background:var(--violet)}footer{font-size:12px;color:var(--muted)}details{margin-top:16px}summary{cursor:pointer;color:var(--muted)}details ul{padding-left:20px}a{color:var(--accent)}
     @media(max-width:760px){main{padding:28px 16px}h1{font-size:26px}.panel{padding:20px 16px}.branches{grid-template-columns:1fr}.job-grid{grid-template-columns:1fr}.section-head{align-items:flex-start;flex-direction:column}.job-path{grid-template-columns:1fr}.job-path .arrow{transform:rotate(90deg);height:28px}.lane-label{margin-top:10px}.aside{margin-bottom:8px}}
     @media print{body{background:#fff}main{padding:0;max-width:none}.panel{break-inside:avoid}.controls,details{display:none}header{margin-bottom:20px}}
+    .task-paths{display:grid;gap:10px;margin:14px 0}.task-paths .node{text-align:left}
   </style>
 </head>
 <body>
@@ -22,59 +23,55 @@
 
   <section class="panel" aria-labelledby="consult-title">
     <div class="section-head"><h2 id="consult-title">问诊请求</h2><span class="section-num">01 / CONSULTATION</span></div>
-    <p class="note">会话按对话 ID 续接：有 ID 继续，无 ID 新建。本轮问题暂存内存；从数据库一次取此前最近 10 条消息，恢复时间正序，共享给意图路由与问药图；不按关键词、状态或时间间隔自动切换。</p>
+    <p class="note">会话按对话 ID 续接：有 ID 继续，无 ID 新建。本轮问题暂存内存；优先从 Redis 读取该会话此前最近 10 条消息，未命中则查询 PostgreSQL 并回填；摘要仍从 PostgreSQL 读取。不按关键词、状态或时间间隔自动切换。</p>
     <p class="note">用户端聊天与管理端调试共用 AG-UI。管理端由后端收集事件后返回完整调试结果；会话归属及软删除校验在执行前完成。提醒与其他引导回复同样在后端保存成功后结束本轮。</p>
     <div class="trunk">
-      <div class="node"><strong>校验会话权限并准备上下文</strong><small>用户问题 · 当前仍由后端预查的家庭药箱 · 用户资料 · 后端读取的最近 10 条消息与摘要</small><code>/consultation/ag-ui → /agent/ag-ui</code></div>
+      <div class="node"><strong>校验会话权限并准备上下文</strong><small>用户问题 · 用户资料 · 最近 10 条消息与摘要 · 后端签发短期药箱查询凭证（不进入模型）</small><code>/consultation/ag-ui → /agent/ag-ui</code></div>
       <div class="arrow" aria-hidden="true">↓</div>
-      <div class="node"><strong>一次读取历史窗口</strong><small>数据库按 created_at、id 倒序取 10 条 → 恢复正序</small><code>historyMessages → 问药图 · 同源 history → 意图路由</code></div>
+      <div class="node"><strong>优先读取 Redis 历史窗口</strong><small>命中：直接使用最近 10 条消息（问题与回答合计）<br>未命中：PostgreSQL 倒序取 10 条 → 恢复正序 → 回填 Redis<br>空历史也可缓存；Redis 异常时回源数据库</small><code>historyMessages → 问药图 · 同源 history → 意图路由</code></div>
       <div class="arrow" aria-hidden="true">↓</div>
       <div class="node highlight"><strong>组装模型消息序列</strong><code>system → 历史 user / assistant → 本轮 user</code><small>最多 10 条此前历史 + 1 条本轮输入；历史不含本轮问题<br>不按文字删除任何历史；此前相同提问完整保留</small></div>
       <details><summary>模型、提示词与历史上下文如何组织</summary><ul><li><code>model</code>：选择使用的模型；<code>systemPrompt</code>：系统指令，作为 system 消息。</li><li>历史作为独立的 <code>user / assistant</code> 消息按时间顺序传入，不拼进本轮提示词。</li><li><code>humanPrompt / userPrompt</code>：本轮问题及该节点需要的业务数据，作为消息序列最后一条 user 消息。</li><li>摘要与会话状态仍作为结构化背景传入解析及审查节点；最近历史不再存放在 <code>conversationContext.recentMessages</code> 中。</li><li>当前使用 LangGraph + 自定义 Provider；不需要引入 createAgent 来实现角色消息序列。</li></ul></details>
       <div class="arrow" aria-hidden="true">↓</div>
-      <div class="node highlight"><strong>意图识别与路由</strong><code>intent_router</code><small>问药 / 寻药 · 提醒请求 · 其他意图</small></div>
+      <div class="node highlight"><strong>意图识别与指代消解</strong><code>intent_router · v3</code><small>仅输入：系统提示词 + 历史 user/assistant 对话 + 本轮用户问题<br>结构化输出：profile（general / medicine）+ content（消解后的问题）<br>两个字段均必填，禁止额外字段；content 为 1–2000 字符<br>下游保留原问题并结合 content；信息不足不猜测，不生成答案</small></div>
     </div>
     <div class="branches">
       <section class="lane" aria-label="问药主流程">
-        <div class="lane-label">↓ 问药咨询 / 家庭药箱寻药</div>
-        <div class="node step"><span class="index">1</span><div><strong>整理问题与上下文</strong><code>preprocess</code></div></div>
+        <div class="lane-label">↓ medicine · 药品相关</div>
+        <div class="node highlight"><strong>medicine 主模型直接处理请求</strong><code>LangChain create_agent · medicine.system.v2.md</code><small>用户原话 + 分类器消解结果 + 最近 10 条历史 + 相关资料<br>注册原生工具 search_household_cabinet<br>不做问题格式整理、任务规划或三类任务分支</small></div>
         <div class="arrow" aria-hidden="true">↓</div>
-        <div class="node step"><span class="index">2</span><div><strong>结构化解析症状</strong><code>parse</code></div></div>
+        <div class="node"><strong>LangChain 限制主模型调用次数</strong><code>ModelCallLimitMiddleware(run_limit=2)</code><small>一轮最多两次主模型请求，工具调用后的续答也计入<br>同一 Agent 实例内循环，不重新创建执行实例，不重置计数<br>主模型 SDK 自动重试关闭；分类器和切题评估单独追踪</small></div>
         <div class="arrow" aria-hidden="true">↓</div>
-        <div class="node step"><span class="index">3</span><div><strong>检查急症风险</strong><code>emergency</code></div></div>
+        <div class="node"><strong>主模型按需调用药品查询工具</strong><code>medicine → search_household_cabinet</code><small>明确药名/别名：name 精确匹配；症状寻药：symptom 真实向量检索；可用库存列表：inventory<br>参数只含 mode/names/symptoms，权限凭证由服务端闭包注入，不进入模型</small></div>
         <div class="arrow" aria-hidden="true">↓</div>
-        <div class="node step"><span class="index">4</span><div><strong>检查特殊人群风险</strong><code>special_population</code></div></div>
+        <div class="node"><strong>工具返回记录或具体失败原因</strong><code>status · reasonCode · reason · items</code><small>found：返回有权限的药品记录及来源<br>no_match：无精确名称匹配／无达到阈值的症状匹配／无可用库存<br>error：权限失效／Embedding 未配置或不可用／查询参数或服务异常<br>异常不能当成药品不存在</small></div>
         <div class="arrow" aria-hidden="true">↓</div>
-        <div class="node step"><span class="index">5</span><div><strong>匹配家庭药箱药品</strong><code>match</code></div></div>
+        <div class="node highlight"><strong>药品查询工具内部：评估是否切题</strong><code>search_household_cabinet → 检索 → 辅助评估模型</code><small>原问题 + 当前查询参数 + 检索结果 → 结构化评估<br>切题：保存回答正文及真实引用，工具返回最终结果<br>不切题（含零结果）：第 1 轮重写查询参数，由工具代码直接再次检索；第 2 轮仍不切题则返回原因<br>整个重试过程不回到主模型，不追加 HumanMessage，无评估中间件</small></div>
         <div class="arrow" aria-hidden="true">↓</div>
-        <div class="node step"><span class="index">6</span><div><strong>审查药品适配性</strong><code>review</code></div></div>
+        <div class="node"><strong>主模型根据工具最终结果回答</strong><small>主模型最多 2 次：调用工具 + 根据最终结果回复<br>每次工具调用内部最多检索 2 轮、辅助评估 2 次、重写 1 次，两个预算独立计数<br>只有切题的回答与引用进入最终结果；未通过记录仅保留执行追踪<br>评估失败不采用未验证结果；达到主模型上限时依据已验证的工具回答返回，不触发第 3 次模型请求</small></div>
+        <details><summary>药箱工具：权限、可见字段和向量维护</summary><ul><li>后端签发 15 分钟凭证，绑定用户、家庭及会话；内部 Token + 签名双重校验，重新检查用户状态、家庭成员关系及会话未删除。</li><li>只检索当前家庭未删除、有库存且未过期的记录；模型不能指定其他家庭。</li><li>白名单返回药名、OTC/RX、适应症、禁忌、不良反应、用法用量、数量、有效期、检索分数及来源；不返回管理员字段、其他用户信息、备注、向量或权限凭证。</li><li>语义文本仅含药名、别名、适应症；旧哈希向量停用。首次症状查询批量补齐真实向量，资料变更或模型版本变化后重新生成。</li><li>先物化家庭可见集合，再计算全部距离，使用精确 kNN，不走 HNSW/IVFFlat；向量分支按 MEDICINE_SIMILARITY_THRESHOLD 过滤。</li><li>未配置或 Embedding 调用失败会明确报错，不伪造向量；药名精确匹配无需 Embedding。</li></ul></details>
         <div class="arrow" aria-hidden="true">↓</div>
-        <div class="node step"><span class="index">7</span><div><strong>执行安全审核</strong><code>safety</code></div></div>
+        <div class="node"><strong>保留既有摘要并更新查询话题</strong><small>仅更新本轮话题和通过切题评估的引用药品，不把模型知识推断为个人病史<br>不再执行固定 parse/review/safety/render 模型链</small></div>
         <div class="arrow" aria-hidden="true">↓</div>
-        <div class="node"><strong>更新会话摘要</strong><code>summarize → END</code><small>合并已有摘要、当前症状与本轮推荐结果</small></div>
-        <div class="arrow" aria-hidden="true">↓</div>
-        <div class="node highlight"><strong>图外流式生成回复</strong><code>render · TEXT_MESSAGE_CONTENT</code></div>
-        <div class="arrow" aria-hidden="true">↓</div>
-        <div class="node"><strong>Agent 返回完整结果</strong><small>回复 · 推荐药品 · 免责声明 · 摘要 · 节点追踪</small></div>
+        <div class="node"><strong>Agent 返回完整结果</strong><small>回复（附药箱资料来源） · 已核验引用保存在执行追踪中 · 免责声明 · 摘要 · 节点追踪</small></div>
         <div class="arrow" aria-hidden="true">↓</div>
         <div class="node"><strong>回答完成后，事务保存完整轮次</strong><small>同一事务：用户问题 + 助手回答 + 会话摘要及状态 + 执行追踪<br>全部成功提交；任一步失败全部回滚</small><code>Prisma $transaction</code></div>
         <div class="arrow" aria-hidden="true">↓</div>
+        <div class="node"><strong>提交后更新 Redis 历史</strong><small>按消息 ID 合并本轮问答，按时间排序，只保留最近 10 条<br>缓存过期：从数据库恢复后合并；更新失败不撤销已提交的对话<br>缓存有效期 1 小时，写入时刷新；删除会话时清除</small></div>
+        <div class="arrow" aria-hidden="true">↓</div>
         <div class="node result"><strong>事务提交并结束语音处理后，确认完成</strong><code>RUN_FINISHED</code><small>模型失败或保存失败：返回 RUN_ERROR<br>本轮用户问题、回答、摘要及执行记录均不写入</small></div>
-        <p class="aside">急症和特殊人群检查更新流程状态；当前图仍按顺序执行，不在这些节点提前退出。</p>
+        <p class="aside">主模型通过系统提示词处理用药信息缺失、处方药及急症风险；记录仅作查询引用。药品写入、修改库存等工具未开放。</p>
       </section>
-      <section class="lane" aria-label="提醒请求引导">
-        <div class="lane-label">↓ 创建 / 修改 / 删除 / 查看提醒</div>
-        <div class="node"><strong>返回定时任务入口引导</strong><small>个人中心 → 定时任务</small></div>
+      <section class="lane" aria-label="通用一次性模型回复">
+        <div class="lane-label">↓ general · 通用交流与入口引导</div>
+        <div class="node highlight"><strong>调用模型生成一次完整回答</strong><code>general_reply · general.system.v2.md · llm.chat</code><small>仅输入：主提示词 + 最近 10 条历史 + 用户原话 + 消解后的问题<br>不输入药箱、健康资料或摘要；不提供业务工具<br>输出普通回答正文，无 action，不做二次分流</small></div>
         <div class="arrow" aria-hidden="true">↓</div>
-        <div class="node result"><strong>结束本轮</strong><small>不进入问药图</small></div>
-        <p class="aside">不生成提醒计划、不请求创建确认、不创建任务。旧会话中确认提醒方案也不会触发创建。</p>
-      </section>
-      <section class="lane" aria-label="其他意图">
-        <div class="lane-label">↓ 录药 / 资料更新 / 闲聊 / 其他</div>
-        <div class="node"><strong>返回对应回复</strong><small>入口引导 · 闲聊回应<br>补充信息提示 · 范围说明</small></div>
+        <div class="node"><strong>一次性返回全文</strong><code>TEXT_MESSAGE_START → TEXT_MESSAGE_CONTENT（完整正文） → TEXT_MESSAGE_END</code><small>一个内容事件返回完整模型回答，不拆块，不使用模型 token 流<br>模型返回空回答或调用失败时报告错误，不编造固定回复</small></div>
         <div class="arrow" aria-hidden="true">↓</div>
-        <div class="node result"><strong>结束本轮</strong><small>不进入问药图</small></div>
+        <div class="node result"><strong>保存完整轮次并确认结束</strong><small>保留既有会话摘要<br>共用后端问答／摘要／执行记录事务及 Redis 回写<br>保存成功后确认 RUN_FINISHED</small></div>
+        <p class="aside">入口分类器统一决定 general / medicine。general 只负责回答，不再转交药品图或执行 action 分支；提醒管理仍只引导到个人中心。</p>
       </section>
+
     </div>
   </section>
 
@@ -91,8 +88,10 @@
     <p class="note">当前是业务流程分离：调度协程仍随 Agent 服务启动，尚未拆成独立部署的服务。</p>
   </section>
   <footer>
-    <p class="note">待优化：寻药意图识别后由 Agent 调用药箱查询工具，取消后端预查；回答结束后分类提取健康事实，作为独立候选资料保存。以上尚未实施。AG-UI 已接通权限、上下文和摘要回写，旧普通与 NDJSON 问诊入口已移除。</p>
+    <details><summary>部署：真实 Embedding 配置与迁移</summary><ul><li>backend 执行 <code>npx prisma migrate deploy</code>，新增独立 semantic_embedding / model / hash 字段；旧哈希向量不再查询。</li><li>后端配置 <code>MEDICINE_EMBEDDING_BASE_URL</code>（兼容 embeddings 接口的服务地址）、<code>MEDICINE_EMBEDDING_API_KEY</code>、<code>MEDICINE_EMBEDDING_MODEL</code>、<code>MEDICINE_EMBEDDING_DIMENSIONS</code>（须等于模型真实输出维度）。</li><li><code>MEDICINE_SIMILARITY_THRESHOLD</code> 默认 0.65，仅作初始值，需结合选定模型与测试集校准；不限制药名精确命中。</li><li><code>AGENT_INTERNAL_TOKEN</code> 在两端保持一致；<code>BACKEND_BASE_URL</code> 必须指向后端内网地址。默认 Agent 调用超时 120 秒，冷启动批量生成向量可能需要按药箱规模调整 <code>AGENT_TIMEOUT_MS</code>。</li><li>精确药名查询无需 Embedding 配置；症状检索未配置模型或模型不可用时显式失败，不能当作“药箱没有匹配药”。</li><li>管理端调试需提供目标 userId 与 householdId；工具会校验目标用户的家庭成员关系，不允许随意遍历其他家庭。调试凭证由后端签名，不写入模型消息、运行事件或执行追踪。</li></ul></details>
+    <p class="note">已实现 general 一次性回复，以及 medicine 原生药品工具调用、工具内部切题评估、按需重写和主模型两次上限。待优化：回答结束后分类提取健康事实，作为独立候选资料保存。AG-UI 已接通权限、上下文和摘要回写，旧普通与 NDJSON 问诊入口已移除。</p>
     <div class="legend"><span><i class="dot"></i>问诊流程</span><span><i class="dot purple"></i>独立定时任务</span><span>本文件离线可用 · 可通过浏览器打印为 PDF</span></div>
+    <details><summary>当前提示词与调用预算</summary><ul><li>general：<code>general.system.v2.md</code>，一次完整文本回答，无二次分流。</li><li>medicine：<code>medicine.system.v2.md</code>，主模型直接决定工具调用，最多两次；无任务规划、固定解析/审核链和额外 render 调用。</li><li>工具内部评估与重写：<code>medicine_rewrite.system.v1.md</code>，返回 relevant、reason、answer、reference_ids、question、query。切题采用回答与实际引用；否则第 1 轮重写参数并直接再次检索，第 2 轮结束。</li><li>每次工具调用最多两轮检索、两次辅助评估、一次重写；主模型最多两次，独立计数。已删除 RetrievalEvaluationMiddleware，不再追加重写 HumanMessage。</li><li>权限、字段白名单、相似度阈值、查询参数与主模型次数由代码及 LangChain 中间件执行。</li></ul></details>
     <details><summary>代码依据</summary><ul><li><code>agent/app/api/consult.py</code> — 统一 AG-UI 意图路由及流式响应</li><li><code>agent/app/graph/builder.py</code> — 问药节点与执行顺序</li><li><code>agent/app/services/due_job_scheduler.py</code> — 到期任务调度</li><li><code>agent/app/services/system_expiry_scheduler.py</code> — 系统过期检查</li><li><code>agent/app/main.py</code> — 服务与调度协程生命周期</li></ul></details>
   </footer>
 </main>

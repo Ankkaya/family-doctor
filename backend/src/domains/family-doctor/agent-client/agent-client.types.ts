@@ -10,6 +10,9 @@ export type AgentMedicineBrief = {
   dosage?: string | null;
   searchScore?: number;
   searchSource?: string;
+  reference?: { source: 'household_cabinet'; inventoryId: string; label: string; matchType: 'exact' | 'semantic' | 'inventory' };
+  quantity?: number;
+  expireAt?: string | null;
 };
 
 export type AgentUserProfile = {
@@ -47,6 +50,7 @@ export type AgentRecommend = {
   indication: string;
   reason: string;
   warnings: string[];
+  reference?: AgentMedicineBrief['reference'];
 };
 
 export type AgentTraceStep = {

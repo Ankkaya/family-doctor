@@ -1,9 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service';
 import { AgentMedicineBrief } from '../agent-client/agent-client.types';
-import { buildDeterministicEmbeddingText, buildSearchText } from '../search/embedding.util';
+import { MedicineEmbeddingService } from '../search/medicine-embedding.service';
 import { CurrentHousehold } from '@/domains/households/households.service';
 import { CreateCabinetInventoryDto } from './dto/create-cabinet-inventory.dto';
 import { QueryAdminCabinetDto } from './dto/query-admin-cabinet.dto';
@@ -78,7 +78,7 @@ const SELECT_ADMIN_CABINET_COLUMNS = Prisma.sql`
 
 @Injectable()
 export class CabinetService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly embeddings: MedicineEmbeddingService) {}
 
   async findCabinet(query: QueryCabinetDto, householdId: string) {
     const page = query.page ?? 1;
@@ -150,10 +150,6 @@ export class CabinetService {
     const expireAt = dto.expireAt?.trim() || null;
     const source = dto.source?.trim() || 'manual';
     const notes = dto.notes?.trim() || null;
-    const embedding = this.buildMedicineEmbedding({
-      ...medicine,
-      notes,
-    });
 
     await this.prisma.$executeRaw(Prisma.sql`
       INSERT INTO household_medicine_inventory (
@@ -194,7 +190,7 @@ export class CabinetService {
         ${source},
         ${notes},
         ${current.appUserId},
-        ${embedding}::vector
+        NULL::vector
       )
     `);
 
@@ -203,15 +199,6 @@ export class CabinetService {
 
   async update(inventoryId: string, householdId: string, dto: UpdateCabinetInventoryDto) {
     const medicine = this.normalizeUpdateDto(dto);
-    const embedding = this.buildMedicineEmbedding({
-      name: medicine.name,
-      aliases: medicine.aliases,
-      indication: medicine.indication,
-      contraindication: medicine.contraindication,
-      adverseReaction: medicine.adverseReaction,
-      dosage: medicine.dosage,
-      notes: dto.notes?.trim() || null,
-    });
     const rows = await this.prisma.$queryRaw<CabinetRow[]>(Prisma.sql`
       UPDATE household_medicine_inventory
       SET
@@ -229,7 +216,9 @@ export class CabinetService {
         expire_at = COALESCE(${dto.expireAt?.trim() || null}::date, expire_at),
         source = COALESCE(${dto.source?.trim() || null}, source),
         notes = COALESCE(${dto.notes?.trim() || null}, notes),
-        embedding = COALESCE(${embedding}::vector, embedding),
+        semantic_embedding = CASE WHEN ${dto.name !== undefined || dto.aliases !== undefined || dto.indication !== undefined} THEN NULL ELSE semantic_embedding END,
+        semantic_embedding_model = CASE WHEN ${dto.name !== undefined || dto.aliases !== undefined || dto.indication !== undefined} THEN NULL ELSE semantic_embedding_model END,
+        semantic_embedding_hash = CASE WHEN ${dto.name !== undefined || dto.aliases !== undefined || dto.indication !== undefined} THEN NULL ELSE semantic_embedding_hash END,
         updated_at = now()
       WHERE id = ${inventoryId}
         AND household_id = ${householdId}
@@ -277,97 +266,81 @@ export class CabinetService {
     return { success: true };
   }
 
-  async findAgentBriefsByHousehold(householdId: string, query?: string): Promise<AgentMedicineBrief[]> {
-    const keyword = query?.trim();
-    if (keyword) {
-      return this.searchAgentBriefsByHousehold(householdId, keyword);
+  /** Only user-visible clinical fields leave this service; never SELECT admin/owner/notes columns. */
+  async searchForAgent(householdId: string, input: { mode: 'name' | 'symptom' | 'inventory'; names: string[]; symptoms: string }): Promise<AgentMedicineBrief[]> {
+    const fields = Prisma.sql`i.id, i.name, i.otc::text AS otc, i.indication,
+      i.contraindication, i.adverse_reaction AS "adverseReaction", i.dosage, i.quantity, i.expire_at::text AS "expireAt"`;
+    const visible = Prisma.sql`i.household_id = ${householdId} AND i.deleted_at IS NULL
+      AND i.quantity > 0 AND (i.expire_at IS NULL OR i.expire_at >= CURRENT_DATE)`;
+    let rows: (AgentMedicineBrief & { aliases?: string[] })[];
+    if (input.mode === 'inventory') {
+      rows = await this.prisma.$queryRaw(Prisma.sql`
+        SELECT ${fields} FROM household_medicine_inventory i
+        WHERE ${visible} ORDER BY i.updated_at DESC, i.id LIMIT 20
+      `);
+    } else if (input.mode === 'name') {
+      const names = input.names.map(name => name.normalize('NFKC').toLowerCase().replace(/\s+/gu, '')).filter(Boolean);
+      if (!names.length) return [];
+      rows = await this.prisma.$queryRaw(Prisma.sql`
+        SELECT ${fields}, 1.0 AS "searchScore"
+        FROM household_medicine_inventory i
+        WHERE ${visible} AND (
+          regexp_replace(lower(normalize(i.name, NFKC)), '[[:space:]]+', '', 'g') = ANY(${names}::text[])
+          OR EXISTS (SELECT 1 FROM unnest(i.aliases) alias
+            WHERE regexp_replace(lower(normalize(alias, NFKC)), '[[:space:]]+', '', 'g') = ANY(${names}::text[]))
+        ) ORDER BY i.updated_at DESC, i.id LIMIT 20
+      `);
+    } else {
+      if (!input.symptoms.trim()) return [];
+      const model = this.embeddings.modelKey;
+      const threshold = this.embeddings.threshold;
+      const vector = await this.embeddings.embed(input.symptoms.trim());
+      // Lazy backfill handles old inventory and model changes without mixing vector spaces.
+      const inventory = await this.prisma.$queryRaw<{
+        id: string; name: string; aliases: string[]; indication: string;
+        model: string | null; hash: string | null;
+      }[]>(Prisma.sql`
+        SELECT i.id, i.name, i.aliases, i.indication,
+          i.semantic_embedding_model AS model, i.semantic_embedding_hash AS hash
+        FROM household_medicine_inventory i WHERE ${visible}
+      `);
+      const pending = inventory.map(item => {
+        const text = [item.name, ...(item.aliases || []), item.indication].join(' ');
+        const hash = createHash('sha256').update(text).digest('hex');
+        return { ...item, text, newHash: hash };
+      }).filter(item => item.model !== model || item.hash !== item.newHash);
+      for (let offset = 0; offset < pending.length; offset += 32) {
+        const batch = pending.slice(offset, offset + 32);
+        const vectors = await this.embeddings.embedMany(batch.map(item => item.text));
+        for (const [index, item] of batch.entries()) {
+          // Concurrent edits must not receive an embedding generated from stale text.
+          await this.prisma.$executeRaw(Prisma.sql`
+            UPDATE household_medicine_inventory SET semantic_embedding = ${vectors[index]}::vector,
+              semantic_embedding_model = ${model}, semantic_embedding_hash = ${item.newHash}
+            WHERE id = ${item.id} AND household_id = ${householdId} AND deleted_at IS NULL
+              AND name = ${item.name} AND aliases = ${item.aliases}::text[] AND indication = ${item.indication}
+          `);
+        }
+      }
+      rows = await this.prisma.$queryRaw(Prisma.sql`
+        WITH scoped AS MATERIALIZED (
+          SELECT ${fields}, i.semantic_embedding
+          FROM household_medicine_inventory i
+          WHERE ${visible} AND i.semantic_embedding_model = ${model}
+            AND i.semantic_embedding IS NOT NULL
+        ), ranked AS MATERIALIZED (
+          SELECT id, name, otc, indication, contraindication, "adverseReaction", dosage, quantity, "expireAt",
+            1 - (semantic_embedding <=> ${vector}::vector) AS "searchScore" FROM scoped
+        ) SELECT * FROM ranked WHERE "searchScore" >= ${threshold}
+        ORDER BY "searchScore" DESC, id LIMIT 20
+      `);
     }
-
-    const rows = await this.prisma.$queryRaw<CabinetRow[]>(Prisma.sql`
-      SELECT ${SELECT_CABINET_COLUMNS}
-      FROM household_medicine_inventory i
-      WHERE i.household_id = ${householdId}
-        AND i.deleted_at IS NULL
-        AND i.quantity > 0
-      ORDER BY i.updated_at DESC
-      LIMIT 500
-    `);
-
-    return rows.map((row) => ({
-      id: row.medicineId,
-      name: row.name,
-      otc: row.otc,
-      indication: row.indication,
-      contraindication: row.contraindication,
-      adverseReaction: row.adverseReaction,
-      dosage: row.dosage,
-    }));
-  }
-
-  private async searchAgentBriefsByHousehold(householdId: string, query: string): Promise<AgentMedicineBrief[]> {
-    const like = `%${query}%`;
-    const queryEmbedding = buildDeterministicEmbeddingText(query);
-    const rows = await this.prisma.$queryRaw<CabinetRow[]>(Prisma.sql`
-      WITH q AS (
-        SELECT
-          plainto_tsquery('simple', ${query}) AS text_query,
-          ${queryEmbedding}::vector AS embedding_query
-      )
-      SELECT
-        ${SELECT_CABINET_COLUMNS},
-        (
-          ts_rank_cd(i.search_vector, q.text_query) * 0.55
-          + CASE
-              WHEN i.embedding IS NOT NULL THEN (1 - (i.embedding <=> q.embedding_query)) * 0.35
-              ELSE 0
-            END
-          + CASE
-              WHEN i.name ILIKE ${like}
-                OR i.indication ILIKE ${like}
-                OR EXISTS (
-                  SELECT 1
-                  FROM unnest(i.aliases) alias
-                  WHERE alias ILIKE ${like}
-                )
-              THEN 0.10
-              ELSE 0
-            END
-        ) as "searchScore",
-        CASE
-          WHEN i.search_vector @@ q.text_query THEN 'fulltext'
-          WHEN i.embedding IS NOT NULL THEN 'vector'
-          ELSE 'keyword'
-        END as "searchSource"
-      FROM household_medicine_inventory i
-      CROSS JOIN q
-      WHERE i.household_id = ${householdId}
-        AND i.deleted_at IS NULL
-        AND i.quantity > 0
-        AND (
-          i.search_vector @@ q.text_query
-          OR i.name ILIKE ${like}
-          OR i.indication ILIKE ${like}
-          OR EXISTS (
-            SELECT 1
-            FROM unnest(i.aliases) alias
-            WHERE alias ILIKE ${like}
-          )
-          OR i.embedding IS NOT NULL
-        )
-      ORDER BY "searchScore" DESC, i.updated_at DESC
-      LIMIT 20
-    `);
-
-    return rows.map((row) => ({
-      id: row.medicineId,
-      name: row.name,
-      otc: row.otc,
-      indication: row.indication,
-      contraindication: row.contraindication,
-      adverseReaction: row.adverseReaction,
-      dosage: row.dosage,
-      searchScore: Number(row.searchScore ?? 0),
-      searchSource: row.searchSource ?? undefined,
+    return rows.map(row => ({
+      id: row.id, name: row.name, otc: row.otc, indication: row.indication,
+      contraindication: row.contraindication, adverseReaction: row.adverseReaction, dosage: row.dosage,
+      quantity: row.quantity, expireAt: row.expireAt,
+      searchScore: input.mode === 'inventory' ? undefined : Number(row.searchScore), searchSource: input.mode === 'name' ? 'exact' : input.mode === 'symptom' ? 'semantic' : 'inventory',
+      reference: { source: 'household_cabinet', inventoryId: row.id, label: '家庭药箱', matchType: input.mode === 'name' ? 'exact' : input.mode === 'symptom' ? 'semantic' : 'inventory' },
     }));
   }
 
@@ -497,16 +470,4 @@ export class CabinetService {
     };
   }
 
-  private buildMedicineEmbedding(input: {
-    name?: string | null;
-    aliases?: string[] | null;
-    indication?: string | null;
-    contraindication?: string | null;
-    adverseReaction?: string | null;
-    dosage?: string | null;
-    notes?: string | null;
-  }) {
-    const text = buildSearchText(input);
-    return text ? buildDeterministicEmbeddingText(text) : null;
-  }
 }

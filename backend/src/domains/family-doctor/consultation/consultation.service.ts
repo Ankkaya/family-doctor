@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { Prisma } from '@prisma/client';
 import { EventType } from '@ag-ui/core';
@@ -12,9 +12,10 @@ import {
   AgentTraceStep,
   AgentUserProfile,
 } from '../agent-client/agent-client.types';
-import { CabinetService } from '../cabinet/cabinet.service';
+import { issueCabinetScope } from '../cabinet/cabinet-tool-scope';
 import { CurrentHousehold, HouseholdsService } from '@/domains/households/households.service';
 import { ConsultationAudioStreamerService } from './consultation-audio-streamer.service';
+import { ConsultationHistoryCacheService, type CachedHistoryMessage } from './consultation-history-cache.service';
 import { QueryConsultationDto } from './dto/query-consultation.dto';
 import { RunConsultationDebugDto } from './dto/run-consultation-debug.dto';
 import {
@@ -128,27 +129,17 @@ const EMPTY_PROFILE_VALUES = new Set([
   'na',
 ]);
 
-const CONSULTATION_DEBUG_NODE_NAMES = [
-  'intent_router',
-  'preprocess',
-  'parse',
-  'emergency',
-  'special_population',
-  'match',
-  'review',
-  'safety',
-  'summarize',
-  'render',
-];
+const CONSULTATION_DEBUG_NODE_NAMES = ['intent_router', 'general_reply', 'medicine', 'medicine_lookup', 'request_rewrite'];
 
 @Injectable()
 export class ConsultationService {
+  private readonly logger = new Logger(ConsultationService.name);
   constructor(
     private readonly prisma: PrismaService,
-    private readonly cabinetService: CabinetService,
     private readonly agentClient: AgentClientService,
     private readonly householdsService: HouseholdsService,
     private readonly audioStreamerService: ConsultationAudioStreamerService,
+    private readonly historyCache: ConsultationHistoryCacheService,
   ) {}
 
   async askAgUiStream(
@@ -172,8 +163,7 @@ export class ConsultationService {
     try {
       await this.ensureSession(sessionId, title, current);
       const memory = await this.buildAgentMemoryContext(sessionId);
-      const [medicines, userProfile, members] = await Promise.all([
-        this.cabinetService.findAgentBriefsByHousehold(current.householdId, this.buildMedicineLookupQuery(question, memory.sessionSummary)),
+      const [userProfile, members] = await Promise.all([
         this.findAgentUserProfile(current.appUserId),
         this.findAgentMembers(current.householdId),
       ]);
@@ -200,7 +190,8 @@ export class ConsultationService {
             question,
             userId: current.appUserId,
             householdId: current.householdId,
-            medicines,
+            medicines: [],
+            cabinetScope: issueCabinetScope({ userId: current.appUserId, householdId: current.householdId, sessionId }),
             members,
             history: memory.historyMessages.map(({ role, content }) => ({ role, content })),
             userProfile,
@@ -226,19 +217,25 @@ export class ConsultationService {
       );
 
       if (!finishedEvent) throw new Error('Agent 未返回完成事件');
+      const userMessageId = randomUUID();
+      const assistantCreatedAt = new Date(Math.max(Date.now(), questionReceivedAt.getTime() + 1));
       await this.prisma.$transaction(async tx => {
         await this.createMessage({
-          id: randomUUID(), sessionId, role: 'USER', content: question, recommends: null,
+          id: userMessageId, sessionId, role: 'USER', content: question, recommends: null,
           createdAt: questionReceivedAt,
         }, tx);
         await this.createMessage({
           id: assistantMessageId, sessionId, role: 'ASSISTANT',
           content: agentResponse.answer, recommends: agentResponse.recommends,
-          createdAt: new Date(Math.max(Date.now(), questionReceivedAt.getTime() + 1)),
+          createdAt: assistantCreatedAt,
         }, tx);
         await this.updateSessionMemory(sessionId, agentResponse.sessionSummary, this.deriveNextStatus(agentResponse.sessionSummary, memory.status), tx);
         await this.createTraces(sessionId, agentResponse.traces ?? [], tx);
       });
+      await this.cacheCommittedHistory(sessionId, [
+        { id: userMessageId, role: 'USER', content: question, createdAt: questionReceivedAt.toISOString() },
+        { id: assistantMessageId, role: 'ASSISTANT', content: agentResponse.answer, createdAt: assistantCreatedAt.toISOString() },
+      ]);
       if (audioStreamer) {
         await audioStreamer.finish();
       }
@@ -287,10 +284,7 @@ export class ConsultationService {
     const createdAt = new Date();
 
     const sessionSummary = this.normalizeSessionSummary(dto.sessionSummary);
-    const [medicines, userProfile] = await Promise.all([
-      dto.householdId?.trim()
-        ? this.cabinetService.findAgentBriefsByHousehold(dto.householdId.trim(), this.buildMedicineLookupQuery(question, sessionSummary))
-        : Promise.resolve([]),
+    const [userProfile] = await Promise.all([
       dto.userId?.trim()
         ? this.findAgentUserProfile(dto.userId.trim())
         : Promise.resolve(null),
@@ -306,7 +300,10 @@ export class ConsultationService {
       forwardedProps: {
         sessionId: debugRunId,
         question,
-        medicines,
+        medicines: [],
+        cabinetScope: dto.userId?.trim() && dto.householdId?.trim()
+          ? issueCabinetScope({ userId: dto.userId.trim(), householdId: dto.householdId.trim(), sessionId: debugRunId, debug: true })
+          : null,
         userProfile,
         historyMessages: this.normalizeDebugHistoryMessages(dto.historyMessages),
         history: this.normalizeDebugHistoryMessages(dto.historyMessages).map(({ role, content }) => ({ role, content })),
@@ -315,6 +312,17 @@ export class ConsultationService {
         allowRxRecommendation: dto.allowRxRecommendation === true,
       },
     }, () => {});
+
+    const lookupResults = agentResponse.traces?.find(trace => trace.nodeName === 'medicine')?.output?.lookupResults;
+    const medicineIds = new Set<string>();
+    if (Array.isArray(lookupResults)) {
+      for (const lookup of lookupResults) {
+        if (!Array.isArray(lookup?.items)) continue;
+        for (const item of lookup.items) {
+          if (typeof item?.id === 'string') medicineIds.add(item.id);
+        }
+      }
+    }
 
     const traces = (agentResponse.traces ?? []).map((trace, index) => this.buildTraceDetail({
       id: randomUUID(),
@@ -335,7 +343,7 @@ export class ConsultationService {
       question,
       householdId: dto.householdId?.trim() || null,
       userId: dto.userId?.trim() || null,
-      medicineCount: medicines.length,
+      medicineCount: medicineIds.size,
       userProfile,
       answer: agentResponse.answer,
       recommends: agentResponse.recommends,
@@ -360,6 +368,9 @@ export class ConsultationService {
       throw new NotFoundException('问诊会话不存在');
     }
 
+    await this.historyCache.invalidate(id).catch(() => {
+      this.logger.warn('Could not invalidate deleted session history cache');
+    });
     return { success: true };
   }
 
@@ -580,7 +591,7 @@ export class ConsultationService {
   }
 
   private async buildAgentMemoryContext(sessionId: string): Promise<SessionMemoryContext> {
-    const [sessionRows, messages] = await Promise.all([
+    const [sessionRows, historyMessages] = await Promise.all([
       this.prisma.$queryRaw<SessionRow[]>(Prisma.sql`
         SELECT
           id,
@@ -597,7 +608,19 @@ export class ConsultationService {
           AND deleted_at IS NULL
         LIMIT 1
       `),
-      this.prisma.$queryRaw<MessageRow[]>(Prisma.sql`
+      this.readHistoryMessages(sessionId),
+    ]);
+
+    const session = sessionRows[0];
+    return {
+      historyMessages,
+      sessionSummary: this.normalizeSessionSummary(session?.summary),
+      status: this.normalizeSessionStatus(session?.status),
+    };
+  }
+
+  private async queryHistoryMessages(sessionId: string): Promise<CachedHistoryMessage[]> {
+    const messages = await this.prisma.$queryRaw<MessageRow[]>(Prisma.sql`
         SELECT
           id,
           session_id as "sessionId",
@@ -609,23 +632,34 @@ export class ConsultationService {
         WHERE session_id = ${sessionId}
         ORDER BY created_at DESC, id DESC
         LIMIT ${RECENT_HISTORY_MESSAGE_LIMIT}
-      `),
-    ]);
+      `);
+    return messages.reverse().map(message => ({
+      id: message.id, role: message.role, content: message.content,
+      createdAt: this.toIsoString(message.createdAt),
+    }));
+  }
 
-    const session = sessionRows[0];
-    const status = this.normalizeSessionStatus(session?.status);
-    const summary = this.normalizeSessionSummary(session?.summary);
-    const selectedMessages = messages.reverse();
+  private async readHistoryMessages(sessionId: string): Promise<CachedHistoryMessage[]> {
+    const cached = await this.historyCache.get(sessionId);
+    if (cached !== null) return cached;
+    const messages = await this.queryHistoryMessages(sessionId);
+    await this.historyCache.seed(sessionId, messages).catch(() => {
+      this.logger.warn('Could not seed history cache; using PostgreSQL history');
+    });
+    return messages;
+  }
 
-    return {
-      historyMessages: selectedMessages.map((message) => ({
-        role: message.role,
-        content: message.content,
-        createdAt: this.toIsoString(message.createdAt),
-      })),
-      sessionSummary: summary,
-      status,
-    };
+  private async cacheCommittedHistory(sessionId: string, messages: CachedHistoryMessage[]) {
+    try {
+      if (!await this.historyCache.append(sessionId, messages)) {
+        await this.historyCache.seed(sessionId, await this.queryHistoryMessages(sessionId));
+        // Also merge after a seed race: an older cache fill may have won SET NX.
+        await this.historyCache.append(sessionId, messages);
+      }
+    } catch {
+      this.logger.warn('History cache update failed after commit; PostgreSQL remains authoritative');
+      await this.historyCache.invalidate(sessionId).catch(() => {});
+    }
   }
 
   private async updateSessionMemory(
@@ -901,16 +935,6 @@ export class ConsultationService {
     return nextStatus === 'closed' ? 'resolved' : nextStatus;
   }
 
-  private buildMedicineLookupQuery(question: string, summary: AgentSessionSummary | null) {
-    const parts = [
-      question,
-      summary?.chiefComplaint,
-      summary?.lastTopic,
-      ...(summary?.symptoms ?? []),
-      ...(summary?.mentionedMedicines ?? []),
-    ];
-    return parts.filter((item): item is string => Boolean(item?.trim())).join(' ').slice(0, 240);
-  }
 
   private pickStringList(value: unknown) {
     return Array.isArray(value)

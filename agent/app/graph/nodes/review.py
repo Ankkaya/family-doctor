@@ -1,4 +1,5 @@
 """候选药品适配审查节点。由 LLM 统一判断药品与用户问题是否匹配。"""
+
 from __future__ import annotations
 
 import json
@@ -16,8 +17,8 @@ from ...tracing import trace_node
 from ..context import dump_conversation_context, history_chat_messages
 
 REVIEW_PROMPT_KEY = "consult.review.system"
-REVIEW_PROMPT_VERSION = "v1"
-REVIEW_SYSTEM = load_prompt("review.system.v1.md")
+REVIEW_PROMPT_VERSION = "v2"
+REVIEW_SYSTEM = load_prompt("review.system.v2.md")
 
 
 def make_review_node(llm: LLMProvider):
@@ -29,7 +30,8 @@ def make_review_node(llm: LLMProvider):
         allow_rx_recommendation = bool(state.get("allow_rx_recommendation"))
         history = history_chat_messages(state)
         prompt_payload = build_review_prompt(
-            question=state.get("normalized_question") or state.get("question") or "",
+            question=state.get("resolved_question") or state.get("question") or "",
+            original_question=state.get("question"),
             parsed=parsed,
             profile=profile,
             flags=flags,
@@ -40,7 +42,7 @@ def make_review_node(llm: LLMProvider):
         with trace_node(
             "review",
             {
-                "question": state.get("normalized_question") or state.get("question") or "",
+                "question": state.get("question") or "",
                 "symptoms": parsed.symptoms,
                 "candidateMedicines": [
                     {
@@ -61,12 +63,14 @@ def make_review_node(llm: LLMProvider):
             },
         ) as rec:
             if not candidates:
-                rec.set_output({
-                    "recommended": [],
-                    "rejected": [],
-                    "decisions": [],
-                    "reviewed": 0,
-                })
+                rec.set_output(
+                    {
+                        "recommended": [],
+                        "rejected": [],
+                        "decisions": [],
+                        "reviewed": 0,
+                    }
+                )
                 risked: list[Recommend] = []
                 decisions: list[dict[str, Any]] = []
             else:
@@ -84,23 +88,24 @@ def make_review_node(llm: LLMProvider):
                     allow_rx_recommendation=allow_rx_recommendation,
                     review=review_output,
                 )
-                rec.set_output({
-                    "recommended": [
-                        {"medicineId": item.medicine_id, "name": item.name}
-                        for item in risked
-                    ],
-                    "rejected": [
-                        {
-                            "medicineId": item["medicineId"],
-                            "name": item["name"],
-                            "reason": item["rejectReason"],
-                        }
-                        for item in decisions
-                        if not item["suitable"]
-                    ],
-                    "decisions": decisions,
-                    "reviewed": len(review_output.items),
-                })
+                rec.set_output(
+                    {
+                        "recommended": [
+                            {"medicineId": item.medicine_id, "name": item.name} for item in risked
+                        ],
+                        "rejected": [
+                            {
+                                "medicineId": item["medicineId"],
+                                "name": item["name"],
+                                "reason": item["rejectReason"],
+                            }
+                            for item in decisions
+                            if not item["suitable"]
+                        ],
+                        "decisions": decisions,
+                        "reviewed": len(review_output.items),
+                    }
+                )
                 rec.set_llm(model=llm.model)
         return {"risked": risked, "review_decisions": decisions, "traces": [rec.step]}
 
@@ -116,9 +121,11 @@ def build_review_prompt(
     candidates: list[MedicineBrief],
     allow_rx_recommendation: bool,
     conversation_context: dict[str, Any],
+    original_question: str | None = None,
 ) -> str:
     payload = {
         "question": question,
+        "originalQuestion": original_question or question,
         "conversationContext": conversation_context,
         "parsedSymptoms": parsed.model_dump(by_alias=True),
         "userProfile": dump_user_profile(profile),
@@ -180,41 +187,52 @@ def apply_review(
             suitable = False
             reject_reason = "；".join(hard_blocks)
 
-        fallback = build_recommendation(medicine=medicine, parsed=parsed, profile=profile, flags=flags)
+        fallback = build_recommendation(
+            medicine=medicine, parsed=parsed, profile=profile, flags=flags
+        )
         reason = item.reason.strip() or fallback.reason
         warnings = merge_unique([*item.warnings, *fallback.warnings, *hard_blocks])
         if suitable:
-            risked.append(Recommend(
-                medicineId=medicine.id,
-                name=medicine.name,
-                otc=medicine.otc,
-                indication=medicine.indication,
-                reason=reason,
-                warnings=warnings,
-            ))
+            risked.append(
+                Recommend(
+                    medicineId=medicine.id,
+                    name=medicine.name,
+                    otc=medicine.otc,
+                    indication=medicine.indication,
+                    reason=reason,
+                    warnings=warnings,
+                    reference=medicine.reference,
+                )
+            )
 
-        decisions.append({
-            "medicineId": medicine.id,
-            "name": medicine.name,
-            "otc": medicine.otc,
-            "suitable": suitable,
-            "reason": reason if suitable else "",
-            "rejectReason": "" if suitable else (reject_reason or reason or "模型判断与当前问题不匹配。"),
-            "warnings": warnings,
-        })
+        decisions.append(
+            {
+                "medicineId": medicine.id,
+                "name": medicine.name,
+                "otc": medicine.otc,
+                "suitable": suitable,
+                "reason": reason if suitable else "",
+                "rejectReason": ""
+                if suitable
+                else (reject_reason or reason or "模型判断与当前问题不匹配。"),
+                "warnings": warnings,
+            }
+        )
 
     for medicine in candidates:
         if medicine.id in reviewed_ids:
             continue
-        decisions.append({
-            "medicineId": medicine.id,
-            "name": medicine.name,
-            "otc": medicine.otc,
-            "suitable": False,
-            "reason": "",
-            "rejectReason": "模型未返回该候选药的审查结果，未纳入推荐。",
-            "warnings": [],
-        })
+        decisions.append(
+            {
+                "medicineId": medicine.id,
+                "name": medicine.name,
+                "otc": medicine.otc,
+                "suitable": False,
+                "reason": "",
+                "rejectReason": "模型未返回该候选药的审查结果，未纳入推荐。",
+                "warnings": [],
+            }
+        )
 
     return risked, decisions
 
